@@ -1,7 +1,7 @@
 {% extends "shell.html" %}
 {% block content %}
 <div class="page-head"><h1>{{ 'Password reset' if reset else 'Tenant created' }}</h1></div>
-<div class="card card-body" style="max-width:640px"><p>Share these credentials with the owner of <b>{{ tenant.name }}</b>. The password is shown once and must be changed at first sign-in.</p>
+<div class="card card-body mw-form"><p>Share these credentials with the owner of <b>{{ tenant.name }}</b>. The password is shown once and must be changed at first sign-in.</p>
 <label class="form-label">Sign-in page</label><div class="cred">{{ url_for('auth.login', slug=tenant.slug, _external=True) }}</div>
 <label class="form-label">Email</label><div class="cred">{{ user.email }}</div>
 <label class="form-label">Temporary password</label><div class="cred">{{ temp }}</div>
