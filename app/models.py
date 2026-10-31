@@ -87,6 +87,8 @@ class TenantBranding(db.Model):
     tagline = db.Column(db.String(240))
     image = db.Column(db.LargeBinary)
     image_mime = db.Column(db.String(40))
+    logo = db.Column(db.LargeBinary)
+    logo_mime = db.Column(db.String(40))
     accent = db.Column(db.String(7))
     background = db.Column(db.String(7))
     panel = db.Column(db.String(7))

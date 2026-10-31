@@ -80,6 +80,15 @@ def _branding(tenant):
     return tenant.branding
 
 
+@public_bp.get("/t/<slug>/logo")
+def login_logo(slug):
+    t = Tenant.query.filter_by(slug=slug).first_or_404()
+    b = t.branding
+    if not b or not b.logo:
+        abort(404)
+    return Response(b.logo, mimetype=b.logo_mime, headers={"Cache-Control": "public, max-age=300"})
+
+
 @public_bp.get("/t/<slug>/image")
 def login_image(slug):
     t = Tenant.query.filter_by(slug=slug).first_or_404()
@@ -328,23 +337,26 @@ def branding():
             setattr(b, field, val.lower() or None)
         b.headline = request.form.get("headline", "").strip()[:120] or None
         b.tagline = request.form.get("tagline", "").strip()[:240] or None
-        if request.form.get("remove_image"):
-            b.image = b.image_mime = None
-        file = request.files.get("image")
-        if file and file.filename:
-            data = file.read(MAX_IMAGE + 1)
-            mime = next((m for sig, m in IMAGE_TYPES.items() if data.startswith(sig)), None)
-            if mime == "image/webp" and data[8:12] != b"WEBP":
-                mime = None
-            if len(data) > MAX_IMAGE:
-                flash("Image must be 2 MB or smaller.", "error")
-                db.session.rollback()
-                return redirect(url_for("ws.branding"))
-            if not mime:
-                flash("Use a PNG, JPEG or WebP image.", "error")
-                db.session.rollback()
-                return redirect(url_for("ws.branding"))
-            b.image, b.image_mime = data, mime
+        for kind in ("image", "logo"):
+            if request.form.get(f"remove_{kind}"):
+                setattr(b, kind, None)
+                setattr(b, f"{kind}_mime", None)
+            file = request.files.get(kind)
+            if file and file.filename:
+                data = file.read(MAX_IMAGE + 1)
+                mime = next((m for sig, m in IMAGE_TYPES.items() if data.startswith(sig)), None)
+                if mime == "image/webp" and data[8:12] != b"WEBP":
+                    mime = None
+                if len(data) > MAX_IMAGE:
+                    flash("Pictures must be 2 MB or smaller.", "error")
+                    db.session.rollback()
+                    return redirect(url_for("ws.branding"))
+                if not mime:
+                    flash("Use a PNG, JPEG or WebP picture.", "error")
+                    db.session.rollback()
+                    return redirect(url_for("ws.branding"))
+                setattr(b, kind, data)
+                setattr(b, f"{kind}_mime", mime)
         db.session.commit()
         flash("Login page updated.", "ok")
         return redirect(url_for("ws.branding"))

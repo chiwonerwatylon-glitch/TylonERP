@@ -5,6 +5,9 @@
 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 <p class="muted">Your team signs in at <b>{{ url_for('auth.login', slug=tenant.slug, _external=True) }}</b></p>
 {% if b and b.image %}<img src="{{ url_for('tenant_public.login_image', slug=tenant.slug) }}?v={{ b.updated_at.timestamp()|int }}" alt="" style="width:100%;max-height:200px;object-fit:cover;border-radius:12px;margin-bottom:14px">{% endif %}
+{% if b and b.logo %}<img src="{{ url_for('tenant_public.login_logo', slug=tenant.slug) }}?v={{ b.updated_at.timestamp()|int }}" alt="" style="height:56px;margin-bottom:10px;border-radius:8px">{% endif %}
+<div class="field"><label>Company logo (PNG, JPEG or WebP, max 2 MB)</label><input type="file" name="logo" accept="image/png,image/jpeg,image/webp"></div>
+{% if b and b.logo %}<div class="field"><label style="text-transform:none;letter-spacing:0"><input type="checkbox" name="remove_logo"> Remove logo</label></div>{% endif %}
 <div class="field"><label>Background picture (PNG, JPEG or WebP, max 2 MB)</label><input type="file" name="image" accept="image/png,image/jpeg,image/webp"></div>
 {% if b and b.image %}<div class="field"><label style="text-transform:none;letter-spacing:0"><input type="checkbox" name="remove_image"> Remove current picture</label></div>{% endif %}
 <div class="field"><label>Headline</label><input type="text" name="headline" maxlength="120" value="{{ b.headline if b and b.headline else '' }}"></div>
