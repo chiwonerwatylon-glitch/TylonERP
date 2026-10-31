@@ -152,3 +152,10 @@ class Sale(db.Model):
     @property
     def balance(self):
         return self.total - self.paid
+
+    @property
+    def kind(self):
+        """Cash = paid in full, Credit = nothing paid, Part-paid in between."""
+        if self.paid >= self.total:
+            return "Cash"
+        return "Credit" if self.paid <= 0 else "Part-paid"

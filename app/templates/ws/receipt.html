@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Receipt {{ '%06d'|format(number) }} · {{ tenant.name }}{% endblock %}
+{% block body %}
+<style>
+  body{background:#e9ecf2;color:#111;font-family:ui-monospace,Menlo,Consolas,monospace}
+  .sheet{width:80mm;max-width:100%;margin:24px auto;background:#fff;color:#111;padding:6mm 5mm;box-shadow:0 8px 30px rgba(0,0,0,.18);font-size:12px;line-height:1.45}
+  .sheet h1{font:700 16px/1.2 Fraunces,Georgia,serif;text-align:center;margin:0 0 2px;letter-spacing:0}
+  .sheet .c{text-align:center}.sheet .m{color:#555}
+  .sheet hr{border:0;border-top:1px dashed #888;margin:8px 0}
+  .sheet .r{display:flex;justify-content:space-between;gap:8px}
+  .sheet .r span:last-child{text-align:right;white-space:nowrap}
+  .sheet .t{font-weight:700;font-size:14px}
+  .sheet .stamp{display:inline-block;border:1.5px solid #111;padding:1px 8px;font-weight:700;letter-spacing:.08em;margin:6px 0}
+  .bar{width:80mm;max-width:100%;margin:18px auto 0;display:flex;gap:8px;font-family:Inter,system-ui,sans-serif}
+  .bar a,.bar button{flex:1;text-align:center;padding:11px;border-radius:10px;border:1px solid #c5ccdb;background:#fff;color:#111;font:600 14px Inter,system-ui,sans-serif;cursor:pointer;text-decoration:none}
+  .bar .p{background:#111;color:#fff;border-color:#111}
+  @media print{
+    @page{size:80mm auto;margin:0}
+    body{background:#fff}
+    .sheet{box-shadow:none;margin:0;width:80mm;padding:4mm}
+    .bar{display:none}
+  }
+</style>
+{% if not embedded %}
+<div class="bar"><button class="p" onclick="window.print()">Print receipt</button><a href="{{ url_for('ws.quick_sell') if back=='quick' else url_for('ws.sales') }}">{{ 'New quick sell' if back=='quick' else 'Back to sales' }}</a></div>
+{% endif %}
+<div class="sheet">
+  <h1>{{ tenant.name }}</h1>
+  {% if tenant.phone %}<div class="c m">{{ tenant.phone }}</div>{% endif %}
+  <div class="c m">{{ tenant.contact_email }}</div>
+  <hr>
+  <div class="r"><span>Receipt</span><span>#{{ '%06d'|format(number) }}</span></div>
+  <div class="r"><span>Date</span><span>{{ s.created_at.strftime('%d %b %Y %H:%M') }} UTC</span></div>
+  <div class="r"><span>Served by</span><span>{{ cashier.name if cashier else '-' }}</span></div>
+  <div class="r"><span>Customer</span><span>{{ s.client.name if s.client else 'Walk-in' }}</span></div>
+  <hr>
+  <div>{{ s.product_name }}</div>
+  <div class="r m"><span>{{ s.quantity }} x {{ '%.2f'|format(s.unit_price) }}</span><span>{{ '%.2f'|format(s.total) }}</span></div>
+  <hr>
+  <div class="r t"><span>TOTAL</span><span>{{ '%.2f'|format(s.total) }}</span></div>
+  <div class="r"><span>Paid</span><span>{{ '%.2f'|format(s.paid) }}</span></div>
+  {% if s.balance > 0 %}<div class="r t"><span>BALANCE DUE</span><span>{{ '%.2f'|format(s.balance) }}</span></div>{% endif %}
+  <div class="c"><span class="stamp">{{ s.kind|upper }} SALE</span></div>
+  <hr>
+  <div class="c m">Thank you for your business</div>
+</div>
+{% if autoprint %}<script>window.addEventListener('load',function(){setTimeout(function(){window.print()},250)});</script>{% endif %}
+{% endblock %}

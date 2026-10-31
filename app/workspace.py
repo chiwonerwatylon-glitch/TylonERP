@@ -307,10 +307,12 @@ def quick_confirm():
     if paid < total and not client:
         return {"error": "Choose a client for a part-paid or credit sale."}, 400
     p.stock -= qty
-    db.session.add(Sale(tenant_id=tid(), client=client, product_id=p.id, product_name=p.name,
-                        quantity=qty, unit_price=p.price, paid=paid, created_by=current_user.id))
+    sale = Sale(tenant_id=tid(), client=client, product_id=p.id, product_name=p.name,
+                quantity=qty, unit_price=p.price, paid=paid, created_by=current_user.id)
+    db.session.add(sale)
     db.session.commit()
-    return {"ok": True, "total": str(total), "stock": p.stock, "name": p.name}
+    return {"ok": True, "total": str(total), "stock": p.stock, "name": p.name,
+            "receipt": url_for("ws.receipt", sid=sale.id, print=1, back="quick")}
 
 
 @ws_bp.post("/products/<int:pid>/restock")
@@ -386,17 +388,56 @@ def sales():
                 flash("Choose a client for a part-paid or credit sale.", "error")
                 return redirect(url_for("ws.sales"))
             p.stock -= qty
-            db.session.add(Sale(tenant_id=tid(), client=client, product_id=p.id, product_name=p.name,
-                                quantity=qty, unit_price=p.price, paid=paid, created_by=current_user.id))
+            sale = Sale(tenant_id=tid(), client=client, product_id=p.id, product_name=p.name,
+                        quantity=qty, unit_price=p.price, paid=paid, created_by=current_user.id)
+            db.session.add(sale)
             db.session.commit()
-            flash("Sale recorded.", "ok")
+            return redirect(url_for("ws.receipt", sid=sale.id, print=1, back="sales"))
         return redirect(url_for("ws.sales"))
+
+    kind = request.args.get("type", "all")
+    query = Sale.query.filter_by(tenant_id=tid())
+    if kind == "cash":
+        query = query.filter(Sale.paid >= Sale.quantity * Sale.unit_price)
+    elif kind == "credit":
+        query = query.filter(Sale.paid < Sale.quantity * Sale.unit_price)
+    else:
+        kind = "all"
+    page = max(1, integer(request.args.get("page"), 1))
+    per_page = 50
+    everything = query.order_by(Sale.created_at.desc(), Sale.id.desc())
+    total_rows = everything.count()
+    items = everything.offset((page - 1) * per_page).limit(per_page).all()
+    all_sales = query.all()
+    summary = {
+        "count": total_rows,
+        "total": sum((x.total for x in all_sales), Decimal(0)),
+        "paid": sum((x.paid for x in all_sales), Decimal(0)),
+        "owed": sum((x.balance for x in all_sales), Decimal(0)),
+    }
+    base = Sale.query.filter_by(tenant_id=tid())
+    counts = {"all": base.count(),
+              "cash": base.filter(Sale.paid >= Sale.quantity * Sale.unit_price).count()}
+    counts["credit"] = counts["all"] - counts["cash"]
+    ids = [i for (i,) in db.session.query(Sale.id).filter_by(tenant_id=tid()).order_by(Sale.id)]
+    numbers = {sid: n for n, sid in enumerate(ids, 1)}
     return render_template(
-        "ws/sales.html",
-        items=Sale.query.filter_by(tenant_id=tid()).order_by(Sale.created_at.desc()).limit(100).all(),
+        "ws/sales.html", items=items, numbers=numbers, kind=kind, page=page, pages=max(1, -(-total_rows // per_page)),
+        summary=summary, counts=counts,
         products=Product.query.filter(Product.tenant_id == tid(), Product.stock > 0).order_by(Product.name).all(),
         clients=Client.query.filter_by(tenant_id=tid()).order_by(Client.name).all(),
     )
+
+
+@ws_bp.get("/sales/<int:sid>/receipt")
+@tenant_user
+def receipt(sid):
+    s = Sale.query.filter_by(id=sid, tenant_id=tid()).first_or_404()
+    number = Sale.query.filter(Sale.tenant_id == tid(), Sale.id <= s.id).count()
+    cashier = db.session.get(User, s.created_by) if s.created_by else None
+    return render_template("ws/receipt.html", s=s, number=number, tenant=current_user.tenant,
+                           cashier=cashier, autoprint=bool(request.args.get("print")),
+                           back=request.args.get("back", "sales"))
 
 
 # ------------------------------------------------------------ debtors
