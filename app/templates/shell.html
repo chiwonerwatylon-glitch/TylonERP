@@ -16,10 +16,10 @@
       {{ theme_menu() }}
       <div class="dropdown">
         <button class="btn btn-link nav-link p-1 d-flex align-items-center gap-2" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Account">
-          <span class="mark" style="flex-basis:32px;width:32px;height:32px;border-radius:50%">{{ current_user.email[0]|upper }}</span>
+          <span class="mark mark-avatar">{{ current_user.email[0]|upper }}</span>
         </button>
-        <ul class="dropdown-menu dropdown-menu-end shadow-sm" style="min-width:230px">
-          <li><div class="dropdown-item-text small text-body-secondary text-truncate" style="max-width:260px">{{ current_user.email }}</div></li>
+        <ul class="dropdown-menu dropdown-menu-end shadow-sm menu-wide">
+          <li><div class="dropdown-item-text small text-body-secondary text-truncate menu-email">{{ current_user.email }}</div></li>
           <li><hr class="dropdown-divider"></li>
           <li><a class="dropdown-item d-flex align-items-center gap-2" href="{{ url_for('auth.change_password') }}">{{ ico('lock') }} Change password</a></li>
           <li><form method="post" action="{{ url_for('auth.logout') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="dropdown-item d-flex align-items-center gap-2">{{ ico('out') }} Sign out</button></form></li>
