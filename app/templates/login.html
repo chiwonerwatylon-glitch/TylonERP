@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Sign in · TylonERP{% endblock %}
+{% block body %}
+<div class="auth">
+  <section class="auth-hero">
+    <div class="brand"><span class="mark">T</span>TylonERP</div>
+    <div class="hero-copy">
+      <h1>Run every business <em>from one place.</em></h1>
+      <p>Stock, sales and debtors for each of your organisations, managed together with calm and clarity.</p>
+    </div>
+    <div class="hero-foot">&copy; {{ now.year }} TylonERP &middot; v{{ app_version }}</div>
+  </section>
+  <section class="auth-form">
+    <form class="card-login" method="post" autocomplete="on">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <h2>Welcome back</h2>
+      <p class="sub">Sign in to continue to your workspace.</p>
+      {% with m = get_flashed_messages(with_categories=true) %}{% for c, t in m %}<div class="flash {{ c }}">{{ t }}</div>{% endfor %}{% endwith %}
+      <div class="field"><label for="email">Email</label>
+        <input id="email" name="email" type="email" required autofocus autocomplete="username" placeholder="you@company.com" value="{{ request.form.email }}"></div>
+      <div class="field"><label for="password">Password</label>
+        <div class="pw"><input id="password" name="password" type="password" required autocomplete="current-password" placeholder="••••••••">
+        <button type="button" onclick="var i=document.getElementById('password');i.type=i.type==='password'?'text':'password';this.textContent=i.type==='password'?'Show':'Hide'">Show</button></div></div>
+      <div class="row"><label><input type="checkbox" name="remember"> Keep me signed in</label></div>
+      <button class="btn btn-gold btn-block" type="submit">Sign in</button>
+    </form>
+  </section>
+</div>
+{% endblock %}

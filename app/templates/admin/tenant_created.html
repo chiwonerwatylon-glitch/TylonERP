@@ -1,0 +1,8 @@
+{% extends "shell.html" %}
+{% block content %}
+<div class="head"><h1>{{ 'Password reset' if reset else 'Tenant created' }}</h1></div>
+<div class="card form"><p>Share these credentials with the owner of <b>{{ tenant.name }}</b>. The password is shown once and must be changed at first sign-in.</p>
+<label>Email</label><div class="cred">{{ user.email }}</div>
+<label>Temporary password</label><div class="cred">{{ temp }}</div>
+<a class="btn" href="{{ url_for('admin.tenant_detail', tenant_id=tenant.id) }}">Done</a></div>
+{% endblock %}
