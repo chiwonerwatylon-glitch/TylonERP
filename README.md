@@ -50,3 +50,18 @@ refuses to start with the built-in dev `SECRET_KEY`, and logs warnings for a sho
 failed sign-in shows the same message. Responses carry CSP, frame, nosniff, referrer and permissions headers,
 and HSTS over HTTPS; pages are sent `Cache-Control: no-store`. The rate limiter counts in memory per gunicorn
 worker; set `RATELIMIT_STORAGE_URI` to a Redis URL to share counts across workers.
+
+## Database migrations
+
+The schema is managed by Alembic through Flask-Migrate (`migrations/`).
+
+- `flask db upgrade` applies pending migrations. Railway runs it as the pre-deploy command, before the new version
+  starts, so web workers never race to change the schema. On SQLite (local development) the app also runs it on start;
+  set `AUTO_MIGRATE=1` or `0` to override.
+- After changing `app/models.py`: `flask db migrate -m "describe change"`, read the generated file, then `flask db upgrade`.
+- `flask db check` fails if the models and the migrations disagree; the test suite checks this too.
+- `0001_baseline` also adopts databases created by earlier releases: it adds missing columns to existing tables and
+  keeps all data, so no manual `stamp` is needed.
+- `flask seed-admin` creates the administrator (or syncs its password) from `ADMIN_EMAIL` and `ADMIN_PASSWORD`.
+- To try Postgres locally: `docker compose up -d db`, then
+  `DATABASE_URL=postgresql://postgres:dev@localhost:5432/tylonerp flask --app main:app db upgrade`.

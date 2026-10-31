@@ -30,17 +30,29 @@ class Settings(BaseSettings):
     login_rate_limit: str = "10 per minute"
     ratelimit_enabled: bool = True
     ratelimit_storage_uri: str = "memory://"
+    # None = decide from the database: SQLite migrates on start, Postgres migrates in the pre-deploy step
+    auto_migrate: bool | None = None
     session_days: int = Field(30, ge=1)
 
     @field_validator("database_url")
     @classmethod
     def _normalise_database_url(cls, url: str) -> str:
-        # Railway and Heroku hand out postgres://, SQLAlchemy needs postgresql://
-        return url.replace("postgres://", "postgresql://", 1) if url.startswith("postgres://") else url
+        # Railway and Heroku hand out postgres://. Name the driver explicitly: SQLAlchemy 2.1 defaults a bare
+        # postgresql:// URL to psycopg 3, but this project ships psycopg2.
+        for prefix in ("postgres://", "postgresql://"):
+            if url.startswith(prefix):
+                return "postgresql+psycopg2://" + url[len(prefix):]
+        return url
 
     @property
     def is_production(self) -> bool:
         return self.env.lower() == "production" or bool(self.railway_environment)
+
+    @property
+    def should_auto_migrate(self) -> bool:
+        if self.auto_migrate is not None:
+            return self.auto_migrate
+        return self.database_url.startswith("sqlite")
 
     @property
     def session_lifetime(self) -> timedelta:

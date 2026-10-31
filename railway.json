@@ -3,6 +3,7 @@
   "deploy": {
     "startCommand": "gunicorn main:app --bind 0.0.0.0:${PORT:-8080} --workers 2 --access-logfile -",
     "healthcheckPath": "/healthz",
-    "healthcheckTimeout": 60
+    "healthcheckTimeout": 60,
+    "preDeployCommand": "flask --app main:app db upgrade"
   }
 }

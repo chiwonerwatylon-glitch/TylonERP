@@ -1,10 +1,12 @@
 import logging
 import re
 from datetime import datetime
+from pathlib import Path
 
 from flask import Flask, g, redirect, request, url_for
 from flask.sessions import SecureCookieSessionInterface
 from flask_login import LoginManager
+from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf.csrf import CSRFProtect
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -17,6 +19,8 @@ VERSION = "1.6.1"
 db = SQLAlchemy()
 login_manager = LoginManager()
 csrf = CSRFProtect()
+migrate = Migrate()
+MIGRATIONS_DIR = str(Path(__file__).resolve().parent.parent / "migrations")
 
 DEFAULT_ADMIN_EMAIL = "admin@erp.co.zw"
 
@@ -78,6 +82,7 @@ def create_app(config=None):
     app.session_interface = ScopedSessionInterface()
 
     db.init_app(app)
+    migrate.init_app(app, db, directory=MIGRATIONS_DIR)
     csrf.init_app(app)
     limiter.init_app(app)
     init_security(app)
@@ -100,9 +105,11 @@ def create_app(config=None):
         g.slug = _slug_from_path()
 
     from . import models
+    from .cli import init_cli
     from .routes import admin_bp, auth_bp, main_bp
     from .workspace import public_bp, ws_bp
 
+    init_cli(app)
     app.register_blueprint(auth_bp)
     app.register_blueprint(admin_bp, url_prefix="/admin")
     app.register_blueprint(main_bp)
@@ -180,45 +187,33 @@ def _auth_colors():
             "hero_text": "#161b2e" if _lum(bg) > .55 else "#ffffff", "hero_b": _mix(bg, "#000000", .3)}
 
 
-def _bootstrap(app):
-    """Create tables, add missing columns and seed the admin.
+def run_migrations(app):
+    """Bring the database to the latest schema (alembic upgrade head)."""
+    from flask_migrate import upgrade
+    from sqlalchemy.exc import OperationalError, ProgrammingError
 
-    Several workers start at once, so tolerate losing a race.
-    """
+    try:
+        upgrade(directory=MIGRATIONS_DIR)
+    except (OperationalError, ProgrammingError):
+        # Several workers can start together on SQLite; the one that loses the race finds the work done
+        db.session.rollback()
+        app.logger.warning("Migration raced with another worker; continuing", exc_info=True)
+
+
+def _bootstrap(app):
+    """Apply migrations when this process owns the schema, then seed the administrator."""
     from sqlalchemy.exc import IntegrityError, OperationalError, ProgrammingError
 
-    try:
-        db.create_all()
-    except (OperationalError, ProgrammingError, IntegrityError):
-        db.session.rollback()
-    _add_missing_columns()
-    try:
-        with db.engine.begin() as conn:
-            conn.execute(db.text(
-                "CREATE UNIQUE INDEX IF NOT EXISTS uq_product_barcode ON products (tenant_id, barcode)"))
-    except Exception:
-        pass
+    if app.extensions["settings"].should_auto_migrate:
+        run_migrations(app)
     try:
         seed_admin(app)
     except IntegrityError:
         db.session.rollback()
-
-
-def _add_missing_columns():
-    """Tiny forward-only migration: add columns introduced after a table existed."""
-    insp = db.inspect(db.engine)
-    for table in db.metadata.sorted_tables:
-        if not insp.has_table(table.name):
-            continue
-        have = {c["name"] for c in insp.get_columns(table.name)}
-        for col in table.columns:
-            if col.name not in have and col.nullable:
-                ddl = col.type.compile(db.engine.dialect)
-                try:
-                    with db.engine.begin() as conn:
-                        conn.execute(db.text(f'ALTER TABLE {table.name} ADD COLUMN {col.name} {ddl}'))
-                except Exception:  # another worker added it first
-                    pass
+    except (OperationalError, ProgrammingError):
+        # Tables do not exist yet: the pre-deploy step (flask db upgrade) has not run
+        db.session.rollback()
+        app.logger.warning("Database schema is missing; run `flask db upgrade`")
 
 
 def seed_admin(app):
