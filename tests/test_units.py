@@ -2,10 +2,13 @@ from decimal import Decimal
 
 import pytest
 
-from app import _lum, _mix
 from app.models import Sale
 from app.routes import EMAIL_RE, SLUG_RE, _safe_next
-from app.workspace import _sniff, integer, money, signature_score
+from app.services.images import sniff_image as _sniff
+from app.services.matching import signature_score
+from app.services.parsing import integer, money
+from app.services.theme import luminance as _lum
+from app.services.theme import mix as _mix
 
 SIG = "0" * 16 + "80" * 27
 

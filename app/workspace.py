@@ -2,7 +2,7 @@
 import re
 import secrets
 from datetime import datetime, timedelta
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from functools import wraps
 
 from flask import Blueprint, Response, abort, flash, g, redirect, render_template, request, url_for
@@ -11,12 +11,14 @@ from flask_login import current_user, login_required
 from . import db
 from .models import Client, Product, Sale, Tenant, TenantBranding, User
 from .routes import EMAIL_RE
+from .services.images import MAX_IMAGE, MAX_PHOTO, sniff_image
+from .services.matching import DUPLICATE_SCORE, is_valid_signature, rank_matches
+from .services.parsing import integer, money
+from .services.sales import apply_kind, open_credit_sales, sale_totals
 
 ws_bp = Blueprint("ws", __name__, url_prefix="/t/<slug>/app")
 public_bp = Blueprint("tenant_public", __name__)
 
-MAX_IMAGE = 2 * 1024 * 1024
-IMAGE_TYPES = {b"\x89PNG\r\n\x1a\n": "image/png", b"\xff\xd8\xff": "image/jpeg", b"RIFF": "image/webp"}
 
 
 HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
@@ -56,22 +58,6 @@ def tid():
     return current_user.tenant_id
 
 
-def money(v, default=None):
-    try:
-        d = Decimal(str(v).strip())
-    except (InvalidOperation, AttributeError):
-        return default
-    return d if d >= 0 else default
-
-
-def integer(v, default=None):
-    try:
-        n = int(v)
-    except (TypeError, ValueError):
-        return default
-    return n if n >= 0 else default
-
-
 # ------------------------------------------------------------ public tenant login page
 
 def _branding(tenant):
@@ -102,13 +88,11 @@ def login_image(slug):
 @tenant_user
 def home():
     t = current_user.tenant
-    today = datetime.utcnow() - timedelta(days=30)
-    sales = Sale.query.filter_by(tenant_id=tid()).all()
-    recent = [s for s in sales if s.created_at >= today]
+    since = datetime.utcnow() - timedelta(days=30)
     low = Product.query.filter(Product.tenant_id == tid(), Product.stock <= Product.reorder_level).order_by(Product.stock).limit(6).all()
     stats = {
-        "revenue": sum((s.total for s in recent), Decimal(0)),
-        "owed": sum((s.balance for s in sales), Decimal(0)),
+        "revenue": sale_totals(db.session, tid(), since=since)["total"],
+        "owed": sale_totals(db.session, tid())["owed"],
         "products": Product.query.filter_by(tenant_id=tid()).count(),
         "clients": Client.query.filter_by(tenant_id=tid()).count(),
     }
@@ -118,27 +102,6 @@ def home():
 
 # ------------------------------------------------------------ products
 
-MAX_PHOTO = 1024 * 1024
-SIG_RE = re.compile(r"^[0-9a-f]{70}$")
-DUPLICATE_SCORE = 0.12  # lower = more alike; below this a photo counts as the same product
-
-
-def _sniff(data):
-    mime = next((m for sig, m in IMAGE_TYPES.items() if data.startswith(sig)), None)
-    if mime == "image/webp" and data[8:12] != b"WEBP":
-        return None
-    return mime
-
-
-def signature_score(a, b):
-    """0 = identical look, 1 = completely different. Mixes shape (dHash) and colour."""
-    if not a or not b or len(a) != 70 or len(b) != 70:
-        return 1.0
-    shape = bin(int(a[:16], 16) ^ int(b[:16], 16)).count("1") / 64
-    ca = [int(a[16 + i:18 + i], 16) for i in range(0, 54, 2)]
-    cb = [int(b[16 + i:18 + i], 16) for i in range(0, 54, 2)]
-    colour = sum(abs(x - y) for x, y in zip(ca, cb)) / (54 * 255)
-    return 0.4 * shape + 0.6 * min(1.0, colour * 3)
 
 
 def _product_json(p, score=None):
@@ -151,10 +114,8 @@ def _product_json(p, score=None):
 
 
 def _best_matches(sig, limit=5):
-    scored = [(signature_score(sig, p.signature), p)
-              for p in Product.query.filter(Product.tenant_id == tid(), Product.signature.isnot(None)).all()]
-    scored.sort(key=lambda t: t[0])
-    return [(sc, p) for sc, p in scored[:limit] if sc < 0.45]
+    candidates = Product.query.filter(Product.tenant_id == tid(), Product.signature.isnot(None)).all()
+    return rank_matches(sig, candidates, limit=limit)
 
 
 @ws_bp.get("/products/<int:pid>/photo")
@@ -191,9 +152,9 @@ def products():
             error = "Describe the scent."
         elif method in ("photo", "scent") and not data:
             error = "Take a photo of the product."
-        elif data and (len(data) > MAX_PHOTO or not _sniff(data)):
+        elif data and (len(data) > MAX_PHOTO or not sniff_image(data)):
             error = "The photo must be a PNG, JPEG or WebP under 1 MB."
-        elif sig and not SIG_RE.match(sig):
+        elif sig and not is_valid_signature(sig):
             error = "Photo signature is invalid. Take the photo again."
         elif method in ("photo", "scent") and not sig:
             error = "Photo could not be analysed. Take the photo again."
@@ -209,7 +170,7 @@ def products():
         else:
             db.session.add(Product(tenant_id=tid(), name=name, price=price, stock=stock, method=method,
                                    barcode=barcode, scent=scent, sku=f.get("sku", "").strip() or None,
-                                   photo=data or None, photo_mime=_sniff(data) if data else None,
+                                   photo=data or None, photo_mime=sniff_image(data) if data else None,
                                    signature=sig, reorder_level=integer(f.get("reorder_level"), 5)))
             try:
                 db.session.commit()
@@ -276,7 +237,7 @@ def quick_match():
             return {"matches": [], "message": f"No product has barcode {code}."}
         return {"matches": [_product_json(p, 0.0)]}
     sig = str(j.get("signature", "")).strip().lower()
-    if not SIG_RE.match(sig):
+    if not is_valid_signature(sig):
         return {"error": "Could not read the picture. Try again."}, 400
     matches = _best_matches(sig)
     if not matches:
@@ -394,29 +355,16 @@ def sales():
         return redirect(url_for("ws.sales"))
 
     kind = request.args.get("type", "all")
-    query = Sale.query.filter_by(tenant_id=tid())
-    if kind == "cash":
-        query = query.filter(Sale.paid >= Sale.quantity * Sale.unit_price)
-    elif kind == "credit":
-        query = query.filter(Sale.paid < Sale.quantity * Sale.unit_price)
-    else:
+    if kind not in ("cash", "credit"):
         kind = "all"
+    query = apply_kind(Sale.query.filter_by(tenant_id=tid()), kind)
     page = max(1, integer(request.args.get("page"), 1))
     per_page = 50
     everything = query.order_by(Sale.created_at.desc(), Sale.id.desc())
     total_rows = everything.count()
     items = everything.offset((page - 1) * per_page).limit(per_page).all()
-    all_sales = query.all()
-    summary = {
-        "count": total_rows,
-        "total": sum((x.total for x in all_sales), Decimal(0)),
-        "paid": sum((x.paid for x in all_sales), Decimal(0)),
-        "owed": sum((x.balance for x in all_sales), Decimal(0)),
-    }
-    base = Sale.query.filter_by(tenant_id=tid())
-    counts = {"all": base.count(),
-              "cash": base.filter(Sale.paid >= Sale.quantity * Sale.unit_price).count()}
-    counts["credit"] = counts["all"] - counts["cash"]
+    summary = sale_totals(db.session, tid(), kind=kind)
+    counts = {k: sale_totals(db.session, tid(), kind=k)["count"] for k in ("all", "cash", "credit")}
     ids = [i for (i,) in db.session.query(Sale.id).filter_by(tenant_id=tid()).order_by(Sale.id)]
     numbers = {sid: n for n, sid in enumerate(ids, 1)}
     return render_template(
@@ -443,8 +391,7 @@ def receipt(sid):
 @ws_bp.get("/debtors")
 @tenant_user
 def debtors():
-    open_sales = [s for s in Sale.query.filter_by(tenant_id=tid()).order_by(Sale.created_at).all()
-                  if s.balance > 0 and s.client]
+    open_sales = open_credit_sales(tid())
     return render_template("ws/debtors.html", items=open_sales,
                            total=sum((s.balance for s in open_sales), Decimal(0)))
 
@@ -559,9 +506,7 @@ def branding():
             file = request.files.get(kind)
             if file and file.filename:
                 data = file.read(MAX_IMAGE + 1)
-                mime = next((m for sig, m in IMAGE_TYPES.items() if data.startswith(sig)), None)
-                if mime == "image/webp" and data[8:12] != b"WEBP":
-                    mime = None
+                mime = sniff_image(data)
                 if len(data) > MAX_IMAGE:
                     flash("Pictures must be 2 MB or smaller.", "error")
                     db.session.rollback()
