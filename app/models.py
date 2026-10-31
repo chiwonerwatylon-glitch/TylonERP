@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 
 from flask_login import UserMixin
+from sqlalchemy.orm import joinedload
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from . import db, login_manager
@@ -75,7 +76,7 @@ class User(UserMixin, db.Model):
 
 @login_manager.user_loader
 def load_user(user_id):
-    return db.session.get(User, int(user_id))
+    return db.session.get(User, int(user_id), options=[joinedload(User.tenant)])
 
 
 class TenantBranding(db.Model):
@@ -86,6 +87,9 @@ class TenantBranding(db.Model):
     tagline = db.Column(db.String(240))
     image = db.Column(db.LargeBinary)
     image_mime = db.Column(db.String(40))
+    accent = db.Column(db.String(7))
+    background = db.Column(db.String(7))
+    panel = db.Column(db.String(7))
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     tenant = db.relationship("Tenant", backref=db.backref("branding", uselist=False, cascade="all, delete-orphan"))
 

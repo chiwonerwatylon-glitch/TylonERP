@@ -4,7 +4,9 @@ from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from functools import wraps
 
-from flask import (Blueprint, Response, abort, flash, redirect, render_template,
+import re
+
+from flask import (Blueprint, Response, abort, g, flash, redirect, render_template,
                    request, url_for)
 from flask_login import current_user, login_required
 
@@ -12,11 +14,20 @@ from . import db
 from .models import Client, Product, Sale, Tenant, TenantBranding, User
 from .routes import EMAIL_RE
 
-ws_bp = Blueprint("ws", __name__, url_prefix="/app")
+ws_bp = Blueprint("ws", __name__, url_prefix="/t/<slug>/app")
 public_bp = Blueprint("tenant_public", __name__)
 
 MAX_IMAGE = 2 * 1024 * 1024
 IMAGE_TYPES = {b"\x89PNG\r\n\x1a\n": "image/png", b"\xff\xd8\xff": "image/jpeg", b"RIFF": "image/webp"}
+
+
+HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
+
+
+@ws_bp.url_value_preprocessor
+def _pop_slug(endpoint, values):
+    if values:
+        g.slug = values.pop("slug", None)
 
 
 def tenant_user(view):
@@ -25,6 +36,8 @@ def tenant_user(view):
     def wrapped(*a, **kw):
         if current_user.is_superadmin or current_user.tenant is None:
             return redirect(url_for("admin.dashboard"))
+        if current_user.tenant.slug != g.slug:
+            abort(404)
         if current_user.must_change_password:
             return redirect(url_for("auth.change_password"))
         return view(*a, **kw)
@@ -304,6 +317,15 @@ def branding():
         if b is None:
             b = TenantBranding(tenant_id=t.id)
             db.session.add(b)
+        for field in ("accent", "background", "panel"):
+            val = request.form.get(field, "").strip()
+            if request.form.get("reset_colours"):
+                val = ""
+            if val and not HEX.match(val):
+                flash("Colours must look like #d4af6a.", "error")
+                db.session.rollback()
+                return redirect(url_for("ws.branding"))
+            setattr(b, field, val.lower() or None)
         b.headline = request.form.get("headline", "").strip()[:120] or None
         b.tagline = request.form.get("tagline", "").strip()[:240] or None
         if request.form.get("remove_image"):

@@ -3,7 +3,7 @@ import secrets
 from datetime import datetime, timedelta
 from functools import wraps
 
-from flask import (Blueprint, abort, flash, redirect, render_template, request,
+from flask import (Blueprint, abort, flash, redirect, render_template, request, session,
                    url_for)
 from flask_login import current_user, login_required, login_user, logout_user
 
@@ -36,7 +36,9 @@ def _safe_next(target):
 
 
 def _home_for(user):
-    return url_for("admin.dashboard") if user.is_superadmin else url_for("ws.home")
+    if user.is_superadmin:
+        return url_for("admin.dashboard")
+    return url_for("ws.home", slug=user.tenant.slug)
 
 
 # ---------------------------------------------------------------- auth
@@ -63,7 +65,8 @@ def login(slug=None):
                 user.locked_until = None
                 user.last_login = datetime.utcnow()
                 db.session.commit()
-                login_user(user, remember=bool(request.form.get("remember")))
+                login_user(user)
+                session.permanent = bool(request.form.get("remember"))
                 return redirect(_safe_next(request.args.get("next")) or _home_for(user))
         else:
             if user:
@@ -77,16 +80,19 @@ def login(slug=None):
 
 
 @auth_bp.post("/logout")
+@auth_bp.post("/t/<slug>/logout")
 @login_required
-def logout():
+def logout(slug=None):
     slug = current_user.tenant.slug if current_user.tenant else None
     logout_user()
+    session.clear()
     return redirect(url_for("auth.login", slug=slug) if slug else url_for("auth.login"))
 
 
 @auth_bp.route("/password", methods=["GET", "POST"])
+@auth_bp.route("/t/<slug>/password", methods=["GET", "POST"])
 @login_required
-def change_password():
+def change_password(slug=None):
     if request.method == "POST":
         current = request.form.get("current", "")
         new = request.form.get("new", "")
