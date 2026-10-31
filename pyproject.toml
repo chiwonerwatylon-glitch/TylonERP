@@ -1,0 +1,23 @@
+[project]
+name = "tylonerp"
+version = "1.6.1"
+description = "Multi-tenant ERP: stock, sales, clients and debtors."
+readme = "README.md"
+requires-python = ">=3.12"
+# Runtime dependencies stay pinned in requirements.txt, which Railway builds from.
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-cov>=5", "ruff>=0.6", "pre-commit>=3.8", "pip-audit>=2.7", "bandit>=1.7"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+extend-exclude = ["app/static/vendor"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "C4", "SIM"]
+# The existing code uses short one-line guards and the legacy Model.query API.
+ignore = ["E501", "E701", "SIM108", "B904", "B905", "UP031"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

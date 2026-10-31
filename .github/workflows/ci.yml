@@ -1,0 +1,24 @@
+name: CI
+on:
+  push:
+    branches: [master]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version-file: .python-version
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            pyproject.toml
+      - run: pip install -r requirements.txt -e ".[dev]"
+      - run: ruff check .
+      - run: bandit -r app -q -ll
+      - run: pip-audit -r requirements.txt
+      - run: pytest -q || [ $? -eq 5 ]  # exit 5 = no tests collected yet
