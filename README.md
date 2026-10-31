@@ -35,6 +35,7 @@ With no `DATABASE_URL` it uses a local SQLite file. Set `ADMIN_PASSWORD` to crea
 - `app/models.py`: tenants, users, products, clients, sales
 - `app/routes.py`: sign-in and system administrator routes
 - `app/workspace.py`: tenant workspace routes
+- `app/services/`: pure logic (see Code layout below)
 - `railway.json`: Railway start command and health check (`/healthz`)
 
 ## Deployment
@@ -65,3 +66,9 @@ The schema is managed by Alembic through Flask-Migrate (`migrations/`).
 - `flask seed-admin` creates the administrator (or syncs its password) from `ADMIN_EMAIL` and `ADMIN_PASSWORD`.
 - To try Postgres locally: `docker compose up -d db`, then
   `DATABASE_URL=postgresql://postgres:dev@localhost:5432/tylonerp flask --app main:app db upgrade`.
+
+## Code layout
+
+`app/services/` holds logic that needs no request or session, so it is tested directly: `parsing` (form input),
+`images` (upload type checks), `matching` (photo similarity), `theme` (tenant colours) and `sales` (totals computed
+in SQL). Route modules call into it.

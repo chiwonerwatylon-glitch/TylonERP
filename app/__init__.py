@@ -13,6 +13,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 
 from .config import load_settings
 from .security import init_security, limiter
+from .services.theme import accent_css, auth_palette
 
 VERSION = "1.6.1"
 
@@ -133,16 +134,6 @@ def create_app(config=None):
     return app
 
 
-def _mix(hex_a, hex_b, t):
-    a, b = (int(hex_a[i:i + 2], 16) for i in (1, 3, 5)), (int(hex_b[i:i + 2], 16) for i in (1, 3, 5))
-    return "#%02x%02x%02x" % tuple(round(x + (y - x) * t) for x, y in zip(a, b))
-
-
-def _lum(h):
-    r, g_, b = (int(h[i:i + 2], 16) / 255 for i in (1, 3, 5))
-    return 0.2126 * r + 0.7152 * g_ + 0.0722 * b
-
-
 def _tenant_for_theme():
     from flask_login import current_user
 
@@ -155,36 +146,18 @@ def _tenant_for_theme():
     return None
 
 
-def _rgb(h):
-    return ",".join(str(int(h[i:i + 2], 16)) for i in (1, 3, 5))
-
-
 def _theme_style():
     """The tenant's accent colour, applied on top of Bootstrap's theme in both light and dark mode."""
     tenant = _tenant_for_theme()
     b = tenant.branding if tenant else None
-    if not b or not b.accent:
-        return ""
-    a = b.accent
-    return (":root,[data-bs-theme]{--bs-primary:%s;--bs-primary-rgb:%s;--bs-link-color:%s;--bs-link-color-rgb:%s;"
-            "--bs-link-hover-color:%s;--bs-link-hover-color-rgb:%s;--on-primary:%s;--hero-a:%s;--hero-b:%s}"
-            % (a, _rgb(a), a, _rgb(a), _mix(a, "#000000", .2), _rgb(_mix(a, "#000000", .2)),
-               "#10131c" if _lum(a) > .6 else "#ffffff", a, _mix(a, "#000000", .45)))
+    return accent_css(b.accent) if b else ""
 
 
 def _auth_colors():
     """The tenant's own background and panel colours; they style the sign-in page only."""
     tenant = _tenant_for_theme()
     b = tenant.branding if tenant else None
-    if not b or not (b.background or b.panel):
-        return None
-    panel = b.panel or b.background
-    bg = b.background or b.panel
-    light = _lum(panel) > .55
-    return {"bg": bg, "panel": panel, "mode": "light" if light else "dark",
-            "text": "#161b2e" if light else "#e8ecf6", "muted": "#5b6682" if light else "#8d99b8",
-            "line": _mix(panel, "#000000" if light else "#ffffff", .16),
-            "hero_text": "#161b2e" if _lum(bg) > .55 else "#ffffff", "hero_b": _mix(bg, "#000000", .3)}
+    return auth_palette(b.background, b.panel) if b else None
 
 
 def run_migrations(app):
