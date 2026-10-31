@@ -48,7 +48,10 @@ h1,h2,h3,h4{font-weight:600}
 /* app bar */
 .appbar{height:var(--nav-h);background:var(--bs-body-bg);border-bottom:1px solid var(--bs-border-color);position:sticky;top:0;z-index:1030;padding:0}
 .appbar .brand{display:flex;align-items:center;gap:.65rem;font-weight:700;font-size:1.05rem;color:var(--bs-body-color);text-decoration:none;min-width:0}
-.appbar .brand span.t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:46vw}
+.appbar .brand span.t{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;overflow-wrap:anywhere;line-height:1.15;font-size:clamp(.82rem,3.6vw,1.05rem)}
+.min-w-0{min-width:0}
+.side-brand-t{min-width:0;overflow-wrap:anywhere;line-height:1.2}
+.side-brand .mark{flex:0 0 34px}
 .mark{flex:0 0 34px;width:34px;height:34px;border-radius:8px;display:grid;place-items:center;background:var(--bs-primary);color:var(--on-primary);font-weight:700}
 .mark-lg{width:48px;height:48px;flex-basis:48px;border-radius:10px;font-size:1.25rem}
 .logo{height:34px;max-width:140px;object-fit:contain;border-radius:6px}
