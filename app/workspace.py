@@ -531,6 +531,9 @@ def member_reset(uid):
 
 # ------------------------------------------------------------ branding
 
+DEFAULT_COLOURS = {"accent": "#0a66c2", "background": "#f4f2ee", "panel": "#ffffff"}
+
+
 @ws_bp.route("/branding", methods=["GET", "POST"])
 @tenant_admin
 def branding():
@@ -542,8 +545,8 @@ def branding():
             db.session.add(b)
         for field in ("accent", "background", "panel"):
             val = request.form.get(field, "").strip()
-            if request.form.get("reset_colours"):
-                val = ""
+            if request.form.get("reset_colours") or val.lower() == DEFAULT_COLOURS[field]:
+                val = ""  # untouched defaults stay unset so light/dark mode keeps working
             if val and not HEX.match(val):
                 flash("Colours must look like #d4af6a.", "error")
                 db.session.rollback()

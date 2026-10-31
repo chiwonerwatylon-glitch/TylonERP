@@ -1,11 +1,11 @@
 {% extends "shell.html" %}
 {% block content %}
-<div class="head"><h1>System</h1><span class="badge gold">v{{ version }}</span></div>
-<div class="grid">
-  <div class="stat"><span>Version</span><b>{{ version }}</b></div>
-  <div class="stat"><span>Database</span><b style="font-size:1.4rem">{{ db_name }}</b></div>
-  {% for k, n in counts.items() %}<div class="stat"><span>{{ plans[k].label }} tenants</span><b>{{ n }}</b></div>{% endfor %}
+<div class="page-head"><h1>System</h1><span class="badge text-bg-primary">v{{ version }}</span></div>
+<div class="row g-3 mb-3">
+  <div class="col-6 col-lg-3"><div class="card stat h-100"><div class="k">Version</div><div class="v">{{ version }}</div></div></div>
+  <div class="col-6 col-lg-3"><div class="card stat h-100"><div class="k">Database</div><div class="v">{{ db_name }}</div></div></div>
+  {% for k, n in counts.items() %}<div class="col-6 col-lg-3"><div class="card stat h-100"><div class="k">{{ plans[k].label }} tenants</div><div class="v">{{ n }}</div></div></div>{% endfor %}
 </div>
-<div class="card"><h3>Upgrades</h3>
-<p class="muted">New versions ship by merging a pull request into <code>master</code>; Railway redeploys automatically and creates any new database tables on boot. Use Tenants to move organisations between plans.</p></div>
+<div class="card card-body"><h2 class="h5">Upgrades</h2>
+<p class="text-body-secondary mb-0">New versions ship by merging a pull request into <code>master</code>; Railway redeploys automatically and creates any new database tables on boot. Use Tenants to move organisations between plans.</p></div>
 {% endblock %}

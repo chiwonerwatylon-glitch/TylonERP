@@ -1,20 +1,20 @@
 {% extends "shell.html" %}
 {% block content %}
-<div class="head"><h1>{{ tenant.name }}</h1><span class="badge {{ 'ok' if tenant.is_active else 'off' }}">{{ 'Active' if tenant.is_active else 'Suspended' }}</span></div>
-<div class="grid">
-  <div class="stat"><span>Plan</span><b>{{ tenant.plan_label }}</b></div>
-  <div class="stat"><span>Users</span><b>{{ tenant.users|length }} / {{ tenant.max_users }}</b></div>
-  <div class="stat"><span>Registered</span><b style="font-size:1.2rem">{{ tenant.created_at.strftime('%d %b %Y') }}</b></div>
+<div class="page-head"><h1>{{ tenant.name }}</h1><span class="badge text-bg-{{ 'success' if tenant.is_active else 'danger' }}">{{ 'Active' if tenant.is_active else 'Suspended' }}</span></div>
+<div class="row g-3 mb-3">
+  <div class="col-6 col-lg-4"><div class="card stat h-100"><div class="k">Plan</div><div class="v">{{ tenant.plan_label }}</div></div></div>
+  <div class="col-6 col-lg-4"><div class="card stat h-100"><div class="k">Users</div><div class="v">{{ tenant.users|length }} / {{ tenant.max_users }}</div></div></div>
+  <div class="col-12 col-lg-4"><div class="card stat h-100"><div class="k">Registered</div><div class="v">{{ tenant.created_at.strftime('%d %b %Y') }}</div></div></div>
 </div>
-<div class="card" style="margin-bottom:18px"><h3>Subscription</h3>
-<form method="post" action="{{ url_for('admin.tenant_plan', tenant_id=tenant.id) }}" class="actions">
+<div class="card card-body mb-3"><h2 class="h5">Subscription</h2>
+<form method="post" action="{{ url_for('admin.tenant_plan', tenant_id=tenant.id) }}" class="row g-2">
 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-<select name="plan" style="max-width:260px">{% for k, p in plans.items() %}<option value="{{ k }}" {{ 'selected' if tenant.plan==k }}>{{ p.label }}</option>{% endfor %}</select>
-<button class="btn btn-gold">{{ 'Change plan' }}</button></form></div>
-<div class="card"><h3>Account</h3>
-<p class="muted">{{ tenant.contact_email }} &middot; {{ tenant.slug }}{% if tenant.phone %} &middot; {{ tenant.phone }}{% endif %}</p>
-<div class="actions">
-<form method="post" action="{{ url_for('admin.tenant_reset', tenant_id=tenant.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn">Reset owner password</button></form>
-<form method="post" action="{{ url_for('admin.tenant_toggle', tenant_id=tenant.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-danger">{{ 'Suspend' if tenant.is_active else 'Activate' }} tenant</button></form>
+<div class="col-12 col-sm-6 col-md-4"><select class="form-select" name="plan">{% for k, p in plans.items() %}<option value="{{ k }}" {{ 'selected' if tenant.plan==k }}>{{ p.label }}</option>{% endfor %}</select></div>
+<div class="col-12 col-sm-auto"><button class="btn btn-primary w-100">Change plan</button></div></form></div>
+<div class="card card-body"><h2 class="h5">Account</h2>
+<p class="text-body-secondary">{{ tenant.contact_email }} &middot; {{ tenant.slug }}{% if tenant.phone %} &middot; {{ tenant.phone }}{% endif %}</p>
+<div class="d-flex flex-wrap gap-2">
+<form method="post" action="{{ url_for('admin.tenant_reset', tenant_id=tenant.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-outline-secondary">Reset owner password</button></form>
+<form method="post" action="{{ url_for('admin.tenant_toggle', tenant_id=tenant.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-outline-danger">{{ 'Suspend' if tenant.is_active else 'Activate' }} tenant</button></form>
 </div></div>
 {% endblock %}

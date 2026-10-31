@@ -1,17 +1,17 @@
 {% extends "shell.html" %}
 {% block content %}
-<div class="head"><h1>Members</h1><span class="badge gold">{{ users|length }} / {{ tenant.max_users }}</span></div>
-{% if created %}<div class="card" style="margin-bottom:20px"><p>Share these sign-in details with <b>{{ created[0].name }}</b>. The password is shown once.</p>
-<label>Sign-in page</label><div class="cred">{{ url_for('auth.login', slug=tenant.slug, _external=True) }}</div>
-<label>Email</label><div class="cred">{{ created[0].email }}</div><label>Temporary password</label><div class="cred">{{ created[1] }}</div></div>{% endif %}
-<form method="post" class="card" style="margin-bottom:20px"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-<div class="two"><div class="field"><label>Name</label><input type="text" name="name" required></div><div class="field"><label>Email</label><input type="email" name="email" required></div></div>
-<div class="field"><label>Role</label><select name="role" style="max-width:240px"><option value="staff">Staff</option><option value="admin">Admin</option></select></div>
-<button class="btn btn-gold">Add member</button></form>
-<div class="card table"><table><tr><th>Member</th><th>Role</th><th>Status</th><th></th></tr>
-{% for u in users %}<tr><td>{{ u.name }}<br><span class="muted">{{ u.email }}</span></td><td>{{ u.role|capitalize }}</td>
-<td><span class="badge {{ 'ok' if u.is_active_flag else 'off' }}">{{ 'Active' if u.is_active_flag else 'Disabled' }}</span></td>
-<td>{% if u.id != current_user.id %}<div class="actions" style="margin:0">
-<form method="post" action="{{ url_for('ws.member_reset', uid=u.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm">Reset password</button></form>
-<form method="post" action="{{ url_for('ws.member_toggle', uid=u.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-danger">{{ 'Disable' if u.is_active_flag else 'Enable' }}</button></form></div>{% endif %}</td></tr>{% endfor %}</table></div>
+<div class="page-head"><h1>Members</h1><span class="badge text-bg-primary fs-6">{{ users|length }} / {{ tenant.max_users }}</span></div>
+{% if created %}<div class="card card-body mb-3"><p>Share these sign-in details with <b>{{ created[0].name }}</b>. The password is shown once.</p>
+<label class="form-label">Sign-in page</label><div class="cred">{{ url_for('auth.login', slug=tenant.slug, _external=True) }}</div>
+<label class="form-label">Email</label><div class="cred">{{ created[0].email }}</div><label class="form-label">Temporary password</label><div class="cred">{{ created[1] }}</div></div>{% endif %}
+<form method="post" class="card card-body mb-3"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<div class="row g-3 mb-3"><div class="col-md-6"><label class="form-label">Name</label><input class="form-control" type="text" name="name" required></div><div class="col-md-6"><label class="form-label">Email</label><input class="form-control" type="email" name="email" required></div></div>
+<div class="mb-3" style="max-width:260px"><label class="form-label">Role</label><select class="form-select" name="role"><option value="staff">Staff</option><option value="admin">Admin</option></select></div>
+<button class="btn btn-primary align-self-start">Add member</button></form>
+<div class="card"><div class="table-responsive"><table class="table align-middle mb-0"><thead><tr><th>Member</th><th>Role</th><th>Status</th><th></th></tr></thead><tbody>
+{% for u in users %}<tr><td class="fw-semibold">{{ u.name }}<br><span class="text-body-secondary small fw-normal">{{ u.email }}</span></td><td>{{ u.role|capitalize }}</td>
+<td><span class="badge text-bg-{{ 'success' if u.is_active_flag else 'danger' }}">{{ 'Active' if u.is_active_flag else 'Disabled' }}</span></td>
+<td class="text-end">{% if u.id != current_user.id %}<div class="d-flex gap-2 justify-content-end flex-wrap">
+<form method="post" action="{{ url_for('ws.member_reset', uid=u.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-secondary">Reset password</button></form>
+<form method="post" action="{{ url_for('ws.member_toggle', uid=u.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-danger">{{ 'Disable' if u.is_active_flag else 'Enable' }}</button></form></div>{% endif %}</td></tr>{% endfor %}</tbody></table></div></div>
 {% endblock %}
