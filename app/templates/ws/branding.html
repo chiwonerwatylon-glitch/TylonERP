@@ -9,5 +9,11 @@
 {% if b and b.image %}<div class="field"><label style="text-transform:none;letter-spacing:0"><input type="checkbox" name="remove_image"> Remove current picture</label></div>{% endif %}
 <div class="field"><label>Headline</label><input type="text" name="headline" maxlength="120" value="{{ b.headline if b and b.headline else '' }}"></div>
 <div class="field"><label>Tagline</label><input type="text" name="tagline" maxlength="240" value="{{ b.tagline if b and b.tagline else '' }}"></div>
+<h3 style="margin:22px 0 12px">Colours</h3>
+<div class="two" style="grid-template-columns:repeat(3,1fr)">
+<div class="field"><label>Accent</label><input type="color" name="accent" value="{{ b.accent if b and b.accent else '#d4af6a' }}" style="height:46px;padding:4px"></div>
+<div class="field"><label>Background</label><input type="color" name="background" value="{{ b.background if b and b.background else '#0b1020' }}" style="height:46px;padding:4px"></div>
+<div class="field"><label>Panels</label><input type="color" name="panel" value="{{ b.panel if b and b.panel else '#121a30' }}" style="height:46px;padding:4px"></div></div>
+<div class="field"><label style="text-transform:none;letter-spacing:0"><input type="checkbox" name="reset_colours"> Reset to the default colours</label></div>
 <button class="btn btn-gold">Save</button></form>
 {% endblock %}
