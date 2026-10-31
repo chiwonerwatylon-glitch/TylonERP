@@ -1,0 +1,393 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Debtors - TylonERP{% endblock %}
+
+{% block sidebar_debtors %}active{% endblock %}
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item active">Debtors</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .debtor-card {
+        background-color: #1e293b;
+        border: 1px solid #334155;
+        border-radius: 12px;
+        padding: 1.5rem;
+        transition: all 0.3s;
+    }
+    
+    .debtor-card:hover {
+        border-color: #6366f1;
+        box-shadow: 0 15px 30px rgba(99, 102, 241, 0.2);
+        transform: translateY(-5px);
+    }
+    
+    .risk-badge {
+        display: inline-block;
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 0.9rem;
+    }
+    
+    .risk-very-low {
+        background-color: rgba(16, 185, 129, 0.2);
+        color: #10b981;
+    }
+    
+    .risk-low {
+        background-color: rgba(34, 197, 94, 0.2);
+        color: #22c55e;
+    }
+    
+    .risk-medium {
+        background-color: rgba(245, 158, 11, 0.2);
+        color: #f59e0b;
+    }
+    
+    .risk-high {
+        background-color: rgba(251, 146, 60, 0.2);
+        color: #fb923c;
+    }
+    
+    .risk-very-high {
+        background-color: rgba(239, 68, 68, 0.2);
+        color: #ef4444;
+    }
+    
+    .aging-breakdown {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0.5rem;
+        margin: 1rem 0;
+    }
+    
+    .aging-item {
+        background-color: #0f172a;
+        padding: 0.75rem;
+        border-radius: 8px;
+        text-align: center;
+    }
+    
+    .aging-label {
+        font-size: 0.75rem;
+        color: #94a3b8;
+        text-transform: uppercase;
+        margin-bottom: 0.25rem;
+    }
+    
+    .aging-amount {
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: #e2e8f0;
+    }
+    
+    .reminders-list {
+        list-style: none;
+        padding: 0;
+        margin: 1rem 0;
+    }
+    
+    .reminder-item {
+        padding: 0.75rem;
+        background-color: #0f172a;
+        border-left: 3px solid #6366f1;
+        margin-bottom: 0.5rem;
+        border-radius: 4px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .reminder-overdue {
+        border-left-color: #ef4444;
+    }
+    
+    .reminder-pending {
+        border-left-color: #f59e0b;
+    }
+    
+    .debtor-actions {
+        display: flex;
+        gap: 0.5rem;
+        margin-top: 1rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+        <h1 style="color: #e2e8f0; margin: 0;">Debtors Management</h1>
+        <div style="display: flex; gap: 1rem;">
+            <button class="btn btn-primary">
+                <i class="bi bi-file-pdf"></i> Aging Report
+            </button>
+            <button class="btn btn-secondary">
+                <i class="bi bi-envelope"></i> Send Reminders
+            </button>
+        </div>
+    </div>
+    
+    <!-- Key Metrics -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+        <div style="background-color: #1e293b; border: 1px solid #334155; padding: 1.5rem; border-radius: 12px;">
+            <div style="color: #94a3b8; font-size: 0.9rem; text-transform: uppercase; margin-bottom: 0.5rem;">Total Outstanding</div>
+            <div style="color: #6366f1; font-size: 2rem; font-weight: 700;">$12,450</div>
+            <div style="color: #ef4444; font-size: 0.85rem; margin-top: 0.5rem;">
+                <i class="bi bi-arrow-up"></i> +8% from last week
+            </div>
+        </div>
+        
+        <div style="background-color: #1e293b; border: 1px solid #334155; padding: 1.5rem; border-radius: 12px;">
+            <div style="color: #94a3b8; font-size: 0.9rem; text-transform: uppercase; margin-bottom: 0.5rem;">Active Debtors</div>
+            <div style="color: #6366f1; font-size: 2rem; font-weight: 700;">8</div>
+            <div style="color: #10b981; font-size: 0.85rem; margin-top: 0.5rem;">
+                <i class="bi bi-arrow-down"></i> -1 from last week
+            </div>
+        </div>
+        
+        <div style="background-color: #1e293b; border: 1px solid #334155; padding: 1.5rem; border-radius: 12px;">
+            <div style="color: #94a3b8; font-size: 0.9rem; text-transform: uppercase; margin-bottom: 0.5rem;">Overdue (30+ Days)</div>
+            <div style="color: #ef4444; font-size: 2rem; font-weight: 700;">3</div>
+            <div style="color: #ef4444; font-size: 0.85rem; margin-top: 0.5rem;">
+                <i class="bi bi-exclamation-circle"></i> Requires action
+            </div>
+        </div>
+        
+        <div style="background-color: #1e293b; border: 1px solid #334155; padding: 1.5rem; border-radius: 12px;">
+            <div style="color: #94a3b8; font-size: 0.9rem; text-transform: uppercase; margin-bottom: 0.5rem;">High Risk</div>
+            <div style="color: #f59e0b; font-size: 2rem; font-weight: 700;">2</div>
+            <div style="color: #f59e0b; font-size: 0.85rem; margin-top: 0.5rem;">
+                <i class="bi bi-exclamation-triangle"></i> Monitor closely
+            </div>
+        </div>
+    </div>
+    
+    <!-- Filters -->
+    <div style="background-color: #1e293b; border: 1px solid #334155; padding: 1rem; border-radius: 12px; margin-bottom: 2rem; display: flex; gap: 1rem; flex-wrap: wrap;">
+        <input type="text" class="form-control form-control-sm" style="max-width: 250px;" placeholder="Search debtor...">
+        <select class="form-select form-select-sm" style="max-width: 150px;">
+            <option>All Risk Levels</option>
+            <option>Very Low</option>
+            <option>Low</option>
+            <option>Medium</option>
+            <option>High</option>
+            <option>Very High</option>
+        </select>
+        <button class="btn btn-sm btn-primary"><i class="bi bi-funnel"></i> Filter</button>
+    </div>
+    
+    <!-- Debtors Grid -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 1.5rem;">
+        <!-- Debtor Card 1 -->
+        <div class="debtor-card">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #334155;">
+                <div>
+                    <div style="font-size: 1.1rem; font-weight: 600; color: #e2e8f0;">Grace Retail Ltd</div>
+                    <div style="color: #94a3b8; font-size: 0.9rem;">📱 +1 (555) 123-4567</div>
+                </div>
+                <span class="risk-badge risk-high">High Risk</span>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #334155;">
+                <div>
+                    <div style="color: #94a3b8; font-size: 0.8rem; text-transform: uppercase;">Outstanding</div>
+                    <div style="color: #ef4444; font-size: 1.3rem; font-weight: 700;">$2,450</div>
+                </div>
+                <div>
+                    <div style="color: #94a3b8; font-size: 0.8rem; text-transform: uppercase;">Credit Limit</div>
+                    <div style="color: #6366f1; font-size: 1.3rem; font-weight: 700;">$10,000</div>
+                </div>
+            </div>
+            
+            <div style="margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #334155;">
+                <div style="color: #94a3b8; font-size: 0.85rem; margin-bottom: 0.5rem;">Aging Breakdown:</div>
+                <div class="aging-breakdown">
+                    <div class="aging-item">
+                        <div class="aging-label">Current</div>
+                        <div class="aging-amount">$450</div>
+                    </div>
+                    <div class="aging-item">
+                        <div class="aging-label">31-60</div>
+                        <div class="aging-amount">$650</div>
+                    </div>
+                    <div class="aging-item">
+                        <div class="aging-label">61-90</div>
+                        <div class="aging-amount">$800</div>
+                    </div>
+                    <div class="aging-item">
+                        <div class="aging-label">91+</div>
+                        <div class="aging-amount">$550</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="margin-bottom: 1rem;">
+                <div style="color: #94a3b8; font-size: 0.85rem; margin-bottom: 0.5rem;">Pending Reminders:</div>
+                <ul class="reminders-list">
+                    <li class="reminder-item reminder-overdue">
+                        <span style="font-size: 0.85rem;">INV-001 - 35 days overdue</span>
+                        <button class="btn btn-xs btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">
+                            <i class="bi bi-send"></i>
+                        </button>
+                    </li>
+                    <li class="reminder-item reminder-pending">
+                        <span style="font-size: 0.85rem;">INV-002 - 8 days overdue</span>
+                        <button class="btn btn-xs btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">
+                            <i class="bi bi-send"></i>
+                        </button>
+                    </li>
+                </ul>
+            </div>
+            
+            <div class="debtor-actions">
+                <button class="btn btn-sm btn-primary" style="flex: 1;">
+                    <i class="bi bi-eye"></i> View Details
+                </button>
+                <button class="btn btn-sm btn-secondary" style="flex: 1;">
+                    <i class="bi bi-credit-card"></i> Record Payment
+                </button>
+                <button class="btn btn-sm btn-warning">
+                    <i class="bi bi-envelope"></i> Send Reminder
+                </button>
+            </div>
+        </div>
+        
+        <!-- Debtor Card 2 -->
+        <div class="debtor-card">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #334155;">
+                <div>
+                    <div style="font-size: 1.1rem; font-weight: 600; color: #e2e8f0;">Fashion Store</div>
+                    <div style="color: #94a3b8; font-size: 0.9rem;">📱 +1 (555) 345-6789</div>
+                </div>
+                <span class="risk-badge risk-medium">Medium Risk</span>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #334155;">
+                <div>
+                    <div style="color: #94a3b8; font-size: 0.8rem; text-transform: uppercase;">Outstanding</div>
+                    <div style="color: #f59e0b; font-size: 1.3rem; font-weight: 700;">$3,650</div>
+                </div>
+                <div>
+                    <div style="color: #94a3b8; font-size: 0.8rem; text-transform: uppercase;">Credit Limit</div>
+                    <div style="color: #6366f1; font-size: 1.3rem; font-weight: 700;">$5,000</div>
+                </div>
+            </div>
+            
+            <div style="margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #334155;">
+                <div style="color: #94a3b8; font-size: 0.85rem; margin-bottom: 0.5rem;">Aging Breakdown:</div>
+                <div class="aging-breakdown">
+                    <div class="aging-item">
+                        <div class="aging-label">Current</div>
+                        <div class="aging-amount">$1,200</div>
+                    </div>
+                    <div class="aging-item">
+                        <div class="aging-label">31-60</div>
+                        <div class="aging-amount">$1,450</div>
+                    </div>
+                    <div class="aging-item">
+                        <div class="aging-label">61-90</div>
+                        <div class="aging-amount">$1,000</div>
+                    </div>
+                    <div class="aging-item">
+                        <div class="aging-label">91+</div>
+                        <div class="aging-amount">$0</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="margin-bottom: 1rem;">
+                <div style="color: #94a3b8; font-size: 0.85rem; margin-bottom: 0.5rem;">Pending Reminders:</div>
+                <ul class="reminders-list">
+                    <li class="reminder-item reminder-pending">
+                        <span style="font-size: 0.85rem;">INV-003 - 12 days overdue</span>
+                        <button class="btn btn-xs btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">
+                            <i class="bi bi-send"></i>
+                        </button>
+                    </li>
+                </ul>
+            </div>
+            
+            <div class="debtor-actions">
+                <button class="btn btn-sm btn-primary" style="flex: 1;">
+                    <i class="bi bi-eye"></i> View Details
+                </button>
+                <button class="btn btn-sm btn-secondary" style="flex: 1;">
+                    <i class="bi bi-credit-card"></i> Record Payment
+                </button>
+                <button class="btn btn-sm btn-warning">
+                    <i class="bi bi-envelope"></i> Send Reminder
+                </button>
+            </div>
+        </div>
+        
+        <!-- Debtor Card 3 -->
+        <div class="debtor-card">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #334155;">
+                <div>
+                    <div style="font-size: 1.1rem; font-weight: 600; color: #e2e8f0;">John's Store</div>
+                    <div style="color: #94a3b8; font-size: 0.9rem;">📱 +1 (555) 567-8901</div>
+                </div>
+                <span class="risk-badge risk-low">Low Risk</span>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #334155;">
+                <div>
+                    <div style="color: #94a3b8; font-size: 0.8rem; text-transform: uppercase;">Outstanding</div>
+                    <div style="color: #10b981; font-size: 1.3rem; font-weight: 700;">$890</div>
+                </div>
+                <div>
+                    <div style="color: #94a3b8; font-size: 0.8rem; text-transform: uppercase;">Credit Limit</div>
+                    <div style="color: #6366f1; font-size: 1.3rem; font-weight: 700;">$8,000</div>
+                </div>
+            </div>
+            
+            <div style="margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #334155;">
+                <div style="color: #94a3b8; font-size: 0.85rem; margin-bottom: 0.5rem;">Aging Breakdown:</div>
+                <div class="aging-breakdown">
+                    <div class="aging-item">
+                        <div class="aging-label">Current</div>
+                        <div class="aging-amount">$890</div>
+                    </div>
+                    <div class="aging-item">
+                        <div class="aging-label">31-60</div>
+                        <div class="aging-amount">$0</div>
+                    </div>
+                    <div class="aging-item">
+                        <div class="aging-label">61-90</div>
+                        <div class="aging-amount">$0</div>
+                    </div>
+                    <div class="aging-item">
+                        <div class="aging-label">91+</div>
+                        <div class="aging-amount">$0</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="margin-bottom: 1rem;">
+                <div style="color: #94a3b8; font-size: 0.85rem; margin-bottom: 0.5rem;">Pending Reminders:</div>
+                <div style="padding: 0.75rem; background-color: rgba(16, 185, 129, 0.1); border-radius: 6px; color: #10b981; font-size: 0.85rem;">
+                    <i class="bi bi-check-circle"></i> No overdue invoices
+                </div>
+            </div>
+            
+            <div class="debtor-actions">
+                <button class="btn btn-sm btn-primary" style="flex: 1;">
+                    <i class="bi bi-eye"></i> View Details
+                </button>
+                <button class="btn btn-sm btn-secondary" style="flex: 1;">
+                    <i class="bi bi-credit-card"></i> Record Payment
+                </button>
+                <button class="btn btn-sm btn-warning" disabled>
+                    <i class="bi bi-envelope"></i> Send Reminder
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

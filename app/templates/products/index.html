@@ -1,0 +1,384 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Products - TylonERP{% endblock %}
+
+{% block sidebar_products %}active{% endblock %}
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item active">Products</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .product-filters {
+        background-color: #1e293b;
+        border: 1px solid #334155;
+        padding: 1.5rem;
+        border-radius: 12px;
+        margin-bottom: 2rem;
+    }
+    
+    .filter-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+    
+    .product-card {
+        background-color: #1e293b;
+        border: 1px solid #334155;
+        border-radius: 12px;
+        overflow: hidden;
+        transition: all 0.3s;
+    }
+    
+    .product-card:hover {
+        border-color: #6366f1;
+        box-shadow: 0 15px 30px rgba(99, 102, 241, 0.2);
+        transform: translateY(-5px);
+    }
+    
+    .product-image {
+        width: 100%;
+        height: 200px;
+        background-color: #334155;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+    }
+    
+    .product-image img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    
+    .product-info {
+        padding: 1.5rem;
+    }
+    
+    .product-name {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #e2e8f0;
+        margin-bottom: 0.5rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    
+    .product-sku {
+        font-size: 0.85rem;
+        color: #94a3b8;
+        margin-bottom: 1rem;
+    }
+    
+    .product-stock {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid #334155;
+    }
+    
+    .stock-badge {
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+    
+    .stock-badge.in-stock {
+        background-color: rgba(16, 185, 129, 0.2);
+        color: #10b981;
+    }
+    
+    .stock-badge.low {
+        background-color: rgba(245, 158, 11, 0.2);
+        color: #f59e0b;
+    }
+    
+    .stock-badge.critical {
+        background-color: rgba(239, 68, 68, 0.2);
+        color: #ef4444;
+    }
+    
+    .product-price {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+    }
+    
+    .price-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #6366f1;
+    }
+    
+    .cost-price {
+        font-size: 0.85rem;
+        color: #94a3b8;
+    }
+    
+    .product-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+    
+    .product-actions button {
+        flex: 1;
+        padding: 0.5rem;
+        font-size: 0.85rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+        <h1 style="color: #e2e8f0; margin: 0;">Products</h1>
+        <div style="display: flex; gap: 1rem;">
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addProductModal">
+                <i class="bi bi-plus-circle"></i> Add Product
+            </button>
+            <button class="btn btn-secondary">
+                <i class="bi bi-upload"></i> Import
+            </button>
+        </div>
+    </div>
+    
+    <!-- Filters -->
+    <div class="product-filters">
+        <div class="filter-row">
+            <div>
+                <label class="form-label" style="color: #cbd5e1;">Search</label>
+                <input type="text" class="form-control" placeholder="Search by name or SKU..." id="searchInput">
+            </div>
+            <div>
+                <label class="form-label" style="color: #cbd5e1;">Category</label>
+                <select class="form-select" id="categoryFilter">
+                    <option value="">All Categories</option>
+                    <option>Fragrances</option>
+                    <option>Diffusers</option>
+                    <option>Candles</option>
+                    <option>Accessories</option>
+                </select>
+            </div>
+            <div>
+                <label class="form-label" style="color: #cbd5e1;">Stock Status</label>
+                <select class="form-select" id="statusFilter">
+                    <option value="">All Status</option>
+                    <option value="in-stock">In Stock</option>
+                    <option value="low">Low Stock</option>
+                    <option value="critical">Critical</option>
+                </select>
+            </div>
+            <div style="display: flex; align-items: flex-end; gap: 0.5rem;">
+                <button class="btn btn-primary" style="flex: 1;">
+                    <i class="bi bi-funnel"></i> Filter
+                </button>
+                <button class="btn btn-secondary" style="flex: 1;">
+                    <i class="bi bi-arrow-clockwise"></i> Reset
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Product Grid -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem;">
+        <!-- Product Card 1 -->
+        <div class="product-card">
+            <div class="product-image">
+                <img src="https://via.placeholder.com/280x200?text=Product+A" alt="Product A">
+            </div>
+            <div class="product-info">
+                <div class="product-name">Premium Lavender Fragrance</div>
+                <div class="product-sku">SKU: FRG-001</div>
+                
+                <div class="product-stock">
+                    <span style="color: #94a3b8;">45 in stock</span>
+                    <span class="stock-badge in-stock">In Stock</span>
+                </div>
+                
+                <div class="product-price">
+                    <div>
+                        <div class="price-value">$45.99</div>
+                        <div class="cost-price">Cost: $28.50</div>
+                    </div>
+                </div>
+                
+                <div class="product-actions">
+                    <button class="btn btn-sm btn-primary">
+                        <i class="bi bi-pencil"></i> Edit
+                    </button>
+                    <button class="btn btn-sm btn-secondary">
+                        <i class="bi bi-eye"></i> View
+                    </button>
+                    <button class="btn btn-sm btn-danger">
+                        <i class="bi bi-trash"></i> Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Product Card 2 (Low Stock) -->
+        <div class="product-card">
+            <div class="product-image">
+                <img src="https://via.placeholder.com/280x200?text=Product+B" alt="Product B">
+            </div>
+            <div class="product-info">
+                <div class="product-name">Rose Essential Oil</div>
+                <div class="product-sku">SKU: OIL-002</div>
+                
+                <div class="product-stock">
+                    <span style="color: #94a3b8;">12 in stock</span>
+                    <span class="stock-badge low">Low Stock</span>
+                </div>
+                
+                <div class="product-price">
+                    <div>
+                        <div class="price-value">$32.50</div>
+                        <div class="cost-price">Cost: $18.00</div>
+                    </div>
+                </div>
+                
+                <div class="product-actions">
+                    <button class="btn btn-sm btn-primary">
+                        <i class="bi bi-pencil"></i> Edit
+                    </button>
+                    <button class="btn btn-sm btn-secondary">
+                        <i class="bi bi-eye"></i> View
+                    </button>
+                    <button class="btn btn-sm btn-danger">
+                        <i class="bi bi-trash"></i> Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Product Card 3 (Critical Stock) -->
+        <div class="product-card">
+            <div class="product-image">
+                <img src="https://via.placeholder.com/280x200?text=Product+C" alt="Product C">
+            </div>
+            <div class="product-info">
+                <div class="product-name">Scented Candle Set</div>
+                <div class="product-sku">SKU: CAN-003</div>
+                
+                <div class="product-stock">
+                    <span style="color: #94a3b8;">3 in stock</span>
+                    <span class="stock-badge critical">Critical</span>
+                </div>
+                
+                <div class="product-price">
+                    <div>
+                        <div class="price-value">$67.99</div>
+                        <div class="cost-price">Cost: $38.50</div>
+                    </div>
+                </div>
+                
+                <div class="product-actions">
+                    <button class="btn btn-sm btn-primary">
+                        <i class="bi bi-pencil"></i> Edit
+                    </button>
+                    <button class="btn btn-sm btn-secondary">
+                        <i class="bi bi-eye"></i> View
+                    </button>
+                    <button class="btn btn-sm btn-danger">
+                        <i class="bi bi-trash"></i> Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Pagination -->
+    <nav aria-label="Product pagination" style="margin-top: 3rem;">
+        <ul class="pagination justify-content-center">
+            <li class="page-item disabled">
+                <a class="page-link" href="#" tabindex="-1">← Previous</a>
+            </li>
+            <li class="page-item active"><a class="page-link" href="#">1</a></li>
+            <li class="page-item"><a class="page-link" href="#">2</a></li>
+            <li class="page-item"><a class="page-link" href="#">3</a></li>
+            <li class="page-item">
+                <a class="page-link" href="#">Next →</a>
+            </li>
+        </ul>
+    </nav>
+</div>
+
+<!-- Add Product Modal -->
+<div class="modal fade" id="addProductModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" style="color: #e2e8f0;">Add New Product</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addProductForm">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Product Name</label>
+                            <input type="text" class="form-control" placeholder="Product name" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">SKU</label>
+                            <input type="text" class="form-control" placeholder="SKU" required>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Cost Price</label>
+                            <input type="number" class="form-control" placeholder="0.00" step="0.01" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Selling Price</label>
+                            <input type="number" class="form-control" placeholder="0.00" step="0.01" required>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Initial Stock</label>
+                            <input type="number" class="form-control" placeholder="0" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Category</label>
+                            <select class="form-select" required>
+                                <option>Select category...</option>
+                                <option>Fragrances</option>
+                                <option>Diffusers</option>
+                                <option>Candles</option>
+                                <option>Accessories</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control" rows="3" placeholder="Product description..."></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Product Image</label>
+                        <input type="file" class="form-control" accept="image/*">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary">Add Product</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

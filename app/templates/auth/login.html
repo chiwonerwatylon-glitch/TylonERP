@@ -1,0 +1,218 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Login - TylonERP{% endblock %}
+
+{% block extra_css %}
+<style>
+    .login-container {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #0f172a, #1e293b);
+    }
+    
+    .login-card {
+        width: 100%;
+        max-width: 450px;
+        padding: 3rem;
+        background-color: #1e293b;
+        border: 2px solid #334155;
+        border-radius: 15px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    }
+    
+    .login-header {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+    
+    .login-header .logo {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+        background: linear-gradient(135deg, #6366f1, #8b5cf6);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+    
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+    
+    .form-label {
+        font-weight: 600;
+        color: #cbd5e1;
+        margin-bottom: 0.5rem;
+    }
+    
+    .input-icon {
+        position: relative;
+    }
+    
+    .input-icon i {
+        position: absolute;
+        left: 15px;
+        top: 38px;
+        color: #94a3b8;
+        pointer-events: none;
+    }
+    
+    .input-icon input {
+        padding-left: 45px;
+    }
+    
+    .remember-forgot {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin: 1rem 0;
+        font-size: 0.9rem;
+    }
+    
+    .remember-forgot a {
+        color: #6366f1;
+        text-decoration: none;
+        transition: color 0.3s;
+    }
+    
+    .remember-forgot a:hover {
+        color: #8b5cf6;
+        text-decoration: underline;
+    }
+    
+    .btn-login {
+        width: 100%;
+        padding: 0.75rem;
+        background: linear-gradient(135deg, #6366f1, #8b5cf6);
+        border: none;
+        color: white;
+        font-weight: 600;
+        border-radius: 8px;
+        transition: all 0.3s;
+        margin-top: 1rem;
+    }
+    
+    .btn-login:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 15px 40px rgba(99, 102, 241, 0.3);
+    }
+    
+    .signup-link {
+        text-align: center;
+        margin-top: 1.5rem;
+        color: #94a3b8;
+    }
+    
+    .signup-link a {
+        color: #6366f1;
+        text-decoration: none;
+        font-weight: 600;
+    }
+    
+    .signup-link a:hover {
+        text-decoration: underline;
+    }
+    
+    .social-login {
+        display: flex;
+        gap: 1rem;
+        margin-top: 2rem;
+    }
+    
+    .social-btn {
+        flex: 1;
+        padding: 0.75rem;
+        background-color: #334155;
+        border: 1px solid #475569;
+        color: #e2e8f0;
+        border-radius: 8px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+    
+    .social-btn:hover {
+        background-color: #475569;
+        border-color: #6366f1;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="login-container">
+    <div class="login-card">
+        <!-- Header -->
+        <div class="login-header">
+            <div class="logo">
+                <i class="bi bi-graph-up"></i>
+            </div>
+            <h2 style="color: #e2e8f0; margin-bottom: 0.5rem;">TylonERP</h2>
+            <p style="color: #94a3b8; margin: 0;">Multi-tenant ERP System</p>
+        </div>
+        
+        <!-- Alert Messages -->
+        {% if error %}
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="bi bi-exclamation-circle"></i> {{ error }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        {% endif %}
+        
+        <!-- Login Form -->
+        <form method="POST" action="/login">
+            <div class="form-group">
+                <label class="form-label">Email Address</label>
+                <div class="input-icon">
+                    <i class="bi bi-envelope"></i>
+                    <input type="email" class="form-control" name="email" placeholder="you@example.com" required>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Password</label>
+                <div class="input-icon">
+                    <i class="bi bi-lock"></i>
+                    <input type="password" class="form-control" name="password" placeholder="••••••••" required>
+                </div>
+            </div>
+            
+            <!-- Remember & Forgot -->
+            <div class="remember-forgot">
+                <label class="form-check-label">
+                    <input type="checkbox" class="form-check-input" name="remember"> Remember me
+                </label>
+                <a href="/forgot-password">Forgot password?</a>
+            </div>
+            
+            <!-- Login Button -->
+            <button type="submit" class="btn btn-login">
+                <i class="bi bi-box-arrow-in-right"></i> Sign In
+            </button>
+        </form>
+        
+        <!-- Divider -->
+        <div style="text-align: center; margin: 2rem 0; color: #94a3b8;">
+            <span>or continue with</span>
+        </div>
+        
+        <!-- Social Login -->
+        <div class="social-login">
+            <button class="social-btn" type="button">
+                <i class="bi bi-google"></i>
+            </button>
+            <button class="social-btn" type="button">
+                <i class="bi bi-microsoft"></i>
+            </button>
+            <button class="social-btn" type="button">
+                <i class="bi bi-apple"></i>
+            </button>
+        </div>
+        
+        <!-- Sign Up Link -->
+        <div class="signup-link">
+            Don't have an account? <a href="/signup">Create one now</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
