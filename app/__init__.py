@@ -1,6 +1,6 @@
-import os
+import logging
 import re
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from flask import Flask, g, redirect, request, url_for
 from flask.sessions import SecureCookieSessionInterface
@@ -8,6 +8,9 @@ from flask_login import LoginManager
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf.csrf import CSRFProtect
 from werkzeug.middleware.proxy_fix import ProxyFix
+
+from .config import load_settings
+from .security import init_security, limiter
 
 VERSION = "1.6.1"
 
@@ -44,34 +47,40 @@ class ScopedSessionInterface(SecureCookieSessionInterface):
         return f"/t/{slug}" if slug else "/"
 
 
-def _database_uri():
-    url = os.getenv("DATABASE_URL", "sqlite:///tylonerp.db")
-    if url.startswith("postgres://"):
-        url = url.replace("postgres://", "postgresql://", 1)
-    return url
+def create_app(config=None):
+    """Build the app. `config` is an optional dict of Flask config overrides (used by tests)."""
+    settings = load_settings()
+    for warning in settings.validate_for_runtime():
+        logging.getLogger(__name__).warning(warning)
 
-
-def create_app():
     app = Flask(__name__)
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+    app.extensions["settings"] = settings
     app.config.update(
-        SECRET_KEY=os.getenv("SECRET_KEY", "dev-only-change-me"),
-        SQLALCHEMY_DATABASE_URI=_database_uri(),
+        SECRET_KEY=settings.secret_key,
+        SQLALCHEMY_DATABASE_URI=settings.database_url,
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="Lax",
-        SESSION_COOKIE_SECURE=os.getenv("COOKIE_SECURE", "1") == "1",
-        PERMANENT_SESSION_LIFETIME=timedelta(days=30),
+        SESSION_COOKIE_SECURE=settings.cookie_secure,
+        PERMANENT_SESSION_LIFETIME=settings.session_lifetime,
+        LOGIN_RATE_LIMIT=settings.login_rate_limit,
+        RATELIMIT_ENABLED=settings.ratelimit_enabled,
+        RATELIMIT_STORAGE_URI=settings.ratelimit_storage_uri,
         SQLALCHEMY_ENGINE_OPTIONS={
             "pool_pre_ping": True,
-            "pool_size": int(os.getenv("DB_POOL_SIZE", "10")),
-            "max_overflow": int(os.getenv("DB_MAX_OVERFLOW", "20")),
+            "pool_size": settings.db_pool_size,
+            "max_overflow": settings.db_max_overflow,
             "pool_recycle": 1800,
         },
     )
+    if config:
+        app.config.update(config)
     app.session_interface = ScopedSessionInterface()
 
     db.init_app(app)
     csrf.init_app(app)
+    limiter.init_app(app)
+    init_security(app)
     login_manager.init_app(app)
     login_manager.login_message = None
 
@@ -216,8 +225,9 @@ def seed_admin(app):
     """Create or sync the system administrator from environment variables."""
     from .models import User
 
-    email = os.getenv("ADMIN_EMAIL", DEFAULT_ADMIN_EMAIL).strip().lower()
-    password = os.getenv("ADMIN_PASSWORD")
+    settings = app.extensions["settings"]
+    email = (settings.admin_email or DEFAULT_ADMIN_EMAIL).strip().lower()
+    password = settings.admin_password
     admin = User.query.filter_by(email=email).first()
     if admin is None:
         if not password:

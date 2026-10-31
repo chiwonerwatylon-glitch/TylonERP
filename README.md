@@ -41,3 +41,12 @@ With no `DATABASE_URL` it uses a local SQLite file. Set `ADMIN_PASSWORD` to crea
 
 Railway deploys from `master`. Set `SECRET_KEY`, `DATABASE_URL` (reference the Postgres service) and
 `ADMIN_PASSWORD` as service variables.
+
+## Security settings
+
+`app/config.py` reads every setting. In production (`ENV=production`, or any Railway environment) the app
+refuses to start with the built-in dev `SECRET_KEY`, and logs warnings for a short key, SQLite, or
+`COOKIE_SECURE=0`. Sign-in is limited to `LOGIN_RATE_LIMIT` (default `10 per minute`) per client IP, and every
+failed sign-in shows the same message. Responses carry CSP, frame, nosniff, referrer and permissions headers,
+and HSTS over HTTPS; pages are sent `Cache-Control: no-store`. The rate limiter counts in memory per gunicorn
+worker; set `RATELIMIT_STORAGE_URI` to a Redis URL to share counts across workers.
