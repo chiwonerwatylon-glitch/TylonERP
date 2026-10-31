@@ -129,6 +129,7 @@ def _lum(h):
 
 def _tenant_for_theme():
     from flask_login import current_user
+
     from .models import Tenant
 
     if current_user.is_authenticated and not current_user.is_superadmin:

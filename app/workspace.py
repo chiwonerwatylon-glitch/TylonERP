@@ -1,13 +1,11 @@
 """Tenant workspace: dashboard, stock, clients, sales, debtors, members, branding."""
+import re
 import secrets
 from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from functools import wraps
 
-import re
-
-from flask import (Blueprint, Response, abort, g, flash, redirect, render_template,
-                   request, url_for)
+from flask import Blueprint, Response, abort, flash, g, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from . import db

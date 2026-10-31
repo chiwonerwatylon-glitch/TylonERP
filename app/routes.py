@@ -3,8 +3,7 @@ import secrets
 from datetime import datetime, timedelta
 from functools import wraps
 
-from flask import (Blueprint, abort, flash, redirect, render_template, request, session,
-                   url_for)
+from flask import Blueprint, abort, flash, redirect, render_template, request, session, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 
 from . import VERSION, db
