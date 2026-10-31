@@ -9,7 +9,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_wtf.csrf import CSRFProtect
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-VERSION = "1.6.0"
+VERSION = "1.6.1"
 
 db = SQLAlchemy()
 login_manager = LoginManager()

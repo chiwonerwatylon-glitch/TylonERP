@@ -79,37 +79,78 @@ const TT = (() => {
   }
 
   // Continuous barcode scanning on a playing <video>. Returns a stop() function.
-  async function scanBarcodes(video, onCode) {
+  // Uses the browser's BarcodeDetector when it works, otherwise a bundled ZXing decoder
+  // that reads frames from a canvas (works in Safari, Firefox and older Chrome).
+  const BASE = (document.currentScript && document.currentScript.src || '/static/capture.js').replace(/[^/]*$/, '');
+  function loadZXing() {
+    return new Promise((res, rej) => {
+      if (window.ZXing) return res();
+      const s = document.createElement('script');
+      s.src = BASE + 'vendor/zxing.min.js';
+      s.onload = res; s.onerror = () => rej(new Error('Barcode scanning could not load. Type the number instead.'));
+      document.head.appendChild(s);
+    });
+  }
+  let zxReader = null;
+  function zxDecode(canvas) {
+    if (!zxReader) {
+      const F = ZXing.BarcodeFormat, hints = new Map();
+      hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [F.EAN_13, F.EAN_8, F.UPC_A, F.UPC_E, F.CODE_128, F.CODE_39, F.ITF, F.QR_CODE]);
+      hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+      zxReader = new ZXing.MultiFormatReader(); zxReader.setHints(hints);
+    }
+    const bmp = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(new ZXing.HTMLCanvasElementLuminanceSource(canvas)));
+    try { return zxReader.decode(bmp).getText(); } catch (e) { return null; }
+  }
+  async function decodeCanvas(canvas) { await loadZXing(); return zxDecode(canvas); }
+
+  async function scanBarcodes(video, onCode, onStatus) {
     let stopped = false, last = '', lastAt = 0;
+    const status = t => { if (onStatus) onStatus(t); };
     const emit = code => {
       const now = Date.now();
       if (code === last && now - lastAt < 2000) return;  // same label still in view
-      last = code; lastAt = now; onCode(code);
+      last = code; lastAt = now; status('Read ' + code); onCode(code);
     };
-    if ('BarcodeDetector' in window) {
-      const det = new BarcodeDetector({formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'itf', 'qr_code']});
-      (async function loop() {
-        while (!stopped) {
-          try {
-            const found = await det.detect(video);
-            if (found.length) emit(found[0].rawValue);
-          } catch (e) {}
-          await new Promise(r => setTimeout(r, 200));
+    const ready = () => video.readyState >= 2 && video.videoWidth > 0;
+
+    async function zxLoop() {
+      await loadZXing();
+      const c = document.createElement('canvas'), ctx = c.getContext('2d', {willReadFrequently: true});
+      while (!stopped) {
+        if (ready()) {
+          const w = Math.min(video.videoWidth, 960), h = Math.round(video.videoHeight * w / video.videoWidth);
+          c.width = w; c.height = h; ctx.drawImage(video, 0, 0, w, h);
+          const code = zxDecode(c);
+          if (code) emit(code);
         }
-      })();
-      return () => { stopped = true; };
+        await new Promise(r => setTimeout(r, 120));
+      }
     }
-    await new Promise((res, rej) => {
-      if (window.ZXing) return res();
-      const s = document.createElement('script');
-      s.src = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js';
-      s.onload = res; s.onerror = () => rej(new Error('Barcode scanning is not supported in this browser. Type the number instead.'));
-      document.head.appendChild(s);
-    });
-    const reader = new ZXing.BrowserMultiFormatReader();
-    reader.decodeFromVideoElement(video, (result) => { if (result && !stopped) emit(result.getText()); });
-    return () => { stopped = true; try { reader.reset(); } catch (e) {} };
+
+    if ('BarcodeDetector' in window) {
+      let det = null;
+      try { det = new BarcodeDetector(); } catch (e) { det = null; }
+      if (det) {
+        let fails = 0;
+        (async function loop() {
+          while (!stopped) {
+            if (ready()) {
+              try { const found = await det.detect(video); fails = 0; if (found.length) emit(found[0].rawValue); }
+              catch (e) {
+                if (++fails >= 5) { status('Switching scanner…'); try { await zxLoop(); } catch (x) { status(x.message); } return; }
+              }
+            }
+            await new Promise(r => setTimeout(r, 150));
+          }
+        })();
+        return () => { stopped = true; };
+      }
+    }
+    await loadZXing();
+    zxLoop();
+    return () => { stopped = true; };
   }
 
-  return {post, startCamera, stopCamera, frameToCanvas, fileToCanvas, toBlob, signature, scanBarcodes, csrf};
+  return {post, startCamera, stopCamera, frameToCanvas, fileToCanvas, toBlob, signature, scanBarcodes, decodeCanvas, csrf};
 })();
