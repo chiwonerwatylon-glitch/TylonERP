@@ -92,9 +92,21 @@
     $('confirm').disabled = true;
     const r = await TT.post(urls.confirm, {product_id: chosen.id, quantity: $('qty').value, paid: $('paid').value, client_id: $('client').value});
     if (r.error) { say(r.error, 'error'); $('confirm').disabled = false; return; }
-    say('Sold ' + $('qty').value + ' × ' + r.name + ' for ' + r.total + '. ' + r.stock + ' left.', 'ok');
+    say('Sold ' + $('qty').value + ' × ' + r.name + ' for ' + r.total + '. ' + r.stock + ' left. Printing receipt…', 'ok');
+    printReceipt(r.receipt);
     $('sell').classList.add('hidden'); $('cands').innerHTML = ''; chosen = null;
   };
+  // print through a hidden frame so the camera page stays open for the next sale
+  function printReceipt(url) {
+    const old = document.getElementById('rframe'); if (old) old.remove();
+    const f = document.createElement('iframe'); f.id = 'rframe';
+    f.style.cssText = 'position:fixed;width:0;height:0;border:0;opacity:0';
+    f.src = url.replace('print=1', 'print=0') ;
+    f.onload = () => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { window.open(url, '_blank'); } };
+    document.body.appendChild(f);
+    const link = document.createElement('a'); link.href = url.replace('print=1', 'print=0'); link.target = '_blank'; link.className = 'btn btn-sm'; link.textContent = 'Open receipt';
+    $('msg').firstChild && $('msg').firstChild.appendChild(document.createTextNode(' ')) && $('msg').firstChild.appendChild(link);
+  }
   window.addEventListener('pagehide', cameraOff);
 })();
 </script>

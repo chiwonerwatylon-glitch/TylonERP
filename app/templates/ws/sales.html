@@ -1,13 +1,41 @@
 {% extends "shell.html" %}
 {% block content %}
 <div class="head"><h1>Sales</h1></div>
+
 <form method="post" class="card" style="margin-bottom:20px"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<h3 style="margin-bottom:14px">New sale</h3>
 <div class="two"><div class="field"><label>Product</label><select name="product_id" required><option value="">Choose</option>{% for p in products %}<option value="{{ p.id }}">{{ p.name }} ({{ p.stock }} left, {{ '%.2f'|format(p.price) }})</option>{% endfor %}</select></div>
 <div class="field"><label>Quantity</label><input type="text" name="quantity" inputmode="numeric" value="1" required></div></div>
 <div class="two"><div class="field"><label>Client (optional for cash sales)</label><select name="client_id"><option value="">Walk-in</option>{% for c in clients %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}</select></div>
 <div class="field"><label>Amount paid (blank = paid in full)</label><input type="text" name="paid" inputmode="decimal"></div></div>
-<button class="btn btn-gold">Record sale</button></form>
-<div class="card table"><table><tr><th>Date</th><th>Item</th><th>Client</th><th>Total</th><th>Balance</th></tr>
-{% for s in items %}<tr><td>{{ s.created_at.strftime('%d %b %H:%M') }}</td><td>{{ s.product_name }} &times; {{ s.quantity }}</td><td>{{ s.client.name if s.client else 'Walk-in' }}</td><td>{{ '%.2f'|format(s.total) }}</td><td>{% if s.balance > 0 %}<span class="badge off">{{ '%.2f'|format(s.balance) }}</span>{% else %}<span class="badge ok">Paid</span>{% endif %}</td></tr>
-{% else %}<tr><td colspan="5" class="muted">No sales yet.</td></tr>{% endfor %}</table></div>
+<button class="btn btn-gold">Record sale and print receipt</button></form>
+
+<div class="grid">
+  <div class="stat"><span>Sales</span><b>{{ summary.count }}</b></div>
+  <div class="stat"><span>Total value</span><b>{{ '%.2f'|format(summary.total) }}</b></div>
+  <div class="stat"><span>Received</span><b>{{ '%.2f'|format(summary.paid) }}</b></div>
+  <div class="stat"><span>Still owed</span><b>{{ '%.2f'|format(summary.owed) }}</b></div>
+</div>
+
+<div class="seg" style="margin-bottom:14px">
+  <a class="tab {{ 'on' if kind=='all' }}" href="{{ url_for('ws.sales') }}">All <small>{{ counts.all }}</small></a>
+  <a class="tab {{ 'on' if kind=='cash' }}" href="{{ url_for('ws.sales', type='cash') }}">Cash <small>{{ counts.cash }}</small></a>
+  <a class="tab {{ 'on' if kind=='credit' }}" href="{{ url_for('ws.sales', type='credit') }}">Credit <small>{{ counts.credit }}</small></a>
+</div>
+
+<div class="card table tscroll"><table><tr><th>Receipt</th><th>Date</th><th>Item</th><th>Client</th><th>Type</th><th>Total</th><th>Paid</th><th>Balance</th><th></th></tr>
+{% for s in items %}<tr>
+<td>#{{ '%06d'|format(numbers[s.id]) }}</td>
+<td>{{ s.created_at.strftime('%d %b %Y %H:%M') }}</td><td>{{ s.product_name }} &times; {{ s.quantity }}</td>
+<td>{{ s.client.name if s.client else 'Walk-in' }}</td>
+<td><span class="badge {{ 'ok' if s.kind=='Cash' else ('off' if s.kind=='Credit' else 'gold') }}">{{ s.kind }}</span></td>
+<td>{{ '%.2f'|format(s.total) }}</td><td>{{ '%.2f'|format(s.paid) }}</td>
+<td>{% if s.balance > 0 %}<span class="badge off">{{ '%.2f'|format(s.balance) }}</span>{% else %}&ndash;{% endif %}</td>
+<td><a class="btn btn-sm" href="{{ url_for('ws.receipt', sid=s.id) }}" target="_blank" rel="noopener">Receipt</a></td></tr>
+{% else %}<tr><td colspan="9" class="muted">No {{ kind if kind!='all' else '' }} sales yet.</td></tr>{% endfor %}</table></div>
+
+{% if pages > 1 %}<div class="actions" style="justify-content:center;margin-top:16px;align-items:center">
+{% if page > 1 %}<a class="btn btn-sm" href="{{ url_for('ws.sales', type=kind, page=page-1) }}">Previous</a>{% endif %}
+<span class="muted">Page {{ page }} of {{ pages }}</span>
+{% if page < pages %}<a class="btn btn-sm" href="{{ url_for('ws.sales', type=kind, page=page+1) }}">Next</a>{% endif %}</div>{% endif %}
 {% endblock %}
