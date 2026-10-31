@@ -1,0 +1,14 @@
+{% extends "shell.html" %}
+{% block content %}
+<div class="head"><h1>Overview</h1><a class="btn btn-gold" href="{{ url_for('admin.tenant_new') }}">Register tenant</a></div>
+<div class="grid">
+  <div class="stat"><span>Tenants</span><b>{{ stats.total }}</b></div>
+  <div class="stat"><span>Active</span><b>{{ stats.active }}</b></div>
+  <div class="stat"><span>Tenant users</span><b>{{ stats.users }}</b></div>
+  <div class="stat"><span>On paid plans</span><b>{{ stats.paid }}</b></div>
+</div>
+<div class="card table"><table><tr><th>Recent tenants</th><th>Plan</th><th>Status</th></tr>
+{% for t in tenants %}<tr><td><a href="{{ url_for('admin.tenant_detail', tenant_id=t.id) }}">{{ t.name }}</a></td><td>{{ t.plan_label }}</td>
+<td><span class="badge {{ 'ok' if t.is_active else 'off' }}">{{ 'Active' if t.is_active else 'Suspended' }}</span></td></tr>
+{% else %}<tr><td colspan="3" class="muted">No tenants yet. Register your first one.</td></tr>{% endfor %}</table></div>
+{% endblock %}

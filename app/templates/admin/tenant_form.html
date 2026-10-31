@@ -1,0 +1,18 @@
+{% extends "shell.html" %}
+{% block content %}
+<div class="head"><h1>Register tenant</h1></div>
+<form method="post" class="form card">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="field"><label>Organisation name</label><input type="text" name="name" required value="{{ form.name }}"></div>
+  <div class="two">
+    <div class="field"><label>Slug</label><input type="text" name="slug" required placeholder="acme-traders" value="{{ form.slug }}"></div>
+    <div class="field"><label>Plan</label><select name="plan">{% for k, p in plans.items() %}<option value="{{ k }}" {{ 'selected' if form.plan==k }}>{{ p.label }} (up to {{ p.max_users }} users)</option>{% endfor %}</select></div>
+  </div>
+  <div class="two">
+    <div class="field"><label>Owner name</label><input type="text" name="owner" value="{{ form.owner }}"></div>
+    <div class="field"><label>Owner email (login)</label><input type="email" name="email" required value="{{ form.email }}"></div>
+  </div>
+  <div class="field"><label>Phone</label><input type="text" name="phone" value="{{ form.phone }}"></div>
+  <button class="btn btn-gold">Create tenant</button>
+</form>
+{% endblock %}

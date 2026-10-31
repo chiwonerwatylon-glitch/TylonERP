@@ -1,0 +1,11 @@
+{% extends "shell.html" %}
+{% block content %}
+<div class="head"><h1>System</h1><span class="badge gold">v{{ version }}</span></div>
+<div class="grid">
+  <div class="stat"><span>Version</span><b>{{ version }}</b></div>
+  <div class="stat"><span>Database</span><b style="font-size:1.4rem">{{ db_name }}</b></div>
+  {% for k, n in counts.items() %}<div class="stat"><span>{{ plans[k].label }} tenants</span><b>{{ n }}</b></div>{% endfor %}
+</div>
+<div class="card"><h3>Upgrades</h3>
+<p class="muted">New versions ship by merging a pull request into <code>master</code>; Railway redeploys automatically and creates any new database tables on boot. Use Tenants to move organisations between plans.</p></div>
+{% endblock %}

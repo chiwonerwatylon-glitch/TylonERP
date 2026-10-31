@@ -1,0 +1,10 @@
+{% extends "shell.html" %}
+{% block content %}
+<div class="head"><h1>Tenants</h1><a class="btn btn-gold" href="{{ url_for('admin.tenant_new') }}">Register tenant</a></div>
+<form method="get" class="field"><input type="text" name="q" value="{{ q }}" placeholder="Search name, slug or email"></form>
+<div class="card table"><table><tr><th>Name</th><th>Slug</th><th>Plan</th><th>Users</th><th>Status</th></tr>
+{% for t in tenants %}<tr><td><a href="{{ url_for('admin.tenant_detail', tenant_id=t.id) }}">{{ t.name }}</a><br><span class="muted">{{ t.contact_email }}</span></td>
+<td>{{ t.slug }}</td><td>{{ t.plan_label }}</td><td>{{ t.users|length }} / {{ t.max_users }}</td>
+<td><span class="badge {{ 'ok' if t.is_active else 'off' }}">{{ 'Active' if t.is_active else 'Suspended' }}</span></td></tr>
+{% else %}<tr><td colspan="5" class="muted">No tenants found.</td></tr>{% endfor %}</table></div>
+{% endblock %}
