@@ -10,6 +10,9 @@ h1,h2,h3{font-family:Fraunces,Georgia,serif;font-weight:600;letter-spacing:-.01e
 .auth-hero:after{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);background-size:48px 48px;mask-image:radial-gradient(circle at 30% 30%,#000,transparent 70%);pointer-events:none}
 .brand{display:flex;align-items:center;gap:12px;font-family:Fraunces,Georgia,serif;font-size:1.35rem;position:relative;z-index:1}
 .mark{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;color:var(--on-gold,#1a1305);font-weight:700;background:linear-gradient(135deg,var(--gold2),var(--gold));box-shadow:0 8px 24px rgba(212,175,106,.35)}
+.logo{height:38px;max-width:140px;object-fit:contain;border-radius:8px}
+.who-co{display:flex;align-items:center;gap:12px;margin-bottom:22px;font-family:Fraunces,Georgia,serif;font-size:1.25rem}
+.who-co .logo{height:44px}
 .hero-copy{position:relative;z-index:1;max-width:460px}
 .hero-copy h1{font-size:2.9rem;line-height:1.1;margin-bottom:18px}
 .hero-copy h1 em{font-style:italic;color:var(--gold2)}
@@ -57,4 +60,4 @@ td{padding:14px;border-bottom:1px solid var(--line)}tr:last-child td{border-bott
 .cred{font-family:ui-monospace,Menlo,monospace;background:var(--bg);border:1px dashed var(--gold);border-radius:11px;padding:14px;margin:6px 0 18px;word-break:break-all}
 .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
 form.inline{display:inline}
-@media(max-width:860px){.auth{grid-template-columns:1fr}.auth-hero{display:none}.shell{grid-template-columns:1fr}.side{flex-direction:row;flex-wrap:wrap;align-items:center}.side .spacer,.side .who{display:none}.main{padding:24px 18px}.two{grid-template-columns:1fr}}
+@media(max-width:860px){.auth{grid-template-columns:1fr;grid-template-rows:auto 1fr}.auth-hero{min-height:170px;padding:24px}.auth-hero .hero-copy,.auth-hero .hero-foot,.auth-hero .brand{display:none}.shell{grid-template-columns:1fr}.side{flex-direction:row;flex-wrap:wrap;align-items:center}.side .spacer,.side .who{display:none}.main{padding:24px 18px}.two{grid-template-columns:1fr}}
