@@ -1,15 +1,128 @@
 {% extends "shell.html" %}
 {% block content %}
-<div class="head"><h1>Stock</h1></div>
-<form method="post" class="card" style="margin-bottom:20px"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-<div class="two"><div class="field"><label>Product</label><input type="text" name="name" required></div><div class="field"><label>SKU</label><input type="text" name="sku"></div></div>
-<div class="two"><div class="field"><label>Price</label><input type="text" name="price" inputmode="decimal" required></div><div class="field"><label>Opening stock</label><input type="text" name="stock" inputmode="numeric" value="0"></div></div>
-<div class="field"><label>Reorder level</label><input type="text" name="reorder_level" inputmode="numeric" value="5" style="max-width:200px"></div>
-<button class="btn btn-gold">Add product</button></form>
-<div class="card table"><table><tr><th>Product</th><th>Price</th><th>In stock</th><th>Restock</th>{% if current_user.role=='admin' %}<th></th>{% endif %}</tr>
-{% for p in items %}<tr><td>{{ p.name }}<br><span class="muted">{{ p.sku or '' }}</span></td><td>{{ '%.2f'|format(p.price) }}</td>
+<div class="head"><h1>Stock</h1><a class="btn btn-gold" href="{{ url_for('ws.quick_sell') }}">Quick sell</a></div>
+
+<div class="seg" id="tabs">
+  <button type="button" data-m="barcode" class="on">Barcode</button>
+  <button type="button" data-m="photo">Photo</button>
+  <button type="button" data-m="scent">Scent</button>
+</div>
+
+<!-- BARCODE: scan to count stock in -->
+<div id="p-barcode" class="card" style="margin-bottom:20px">
+  <h3>Count stock by scanning</h3>
+  <p class="muted">Point the camera at each item. A known barcode adds one unit. A product is never created twice.</p>
+  <div class="cam"><video id="bv" muted playsinline></video><div class="reticle"></div><div class="hint" id="bhint">Camera is off</div></div>
+  <div class="actions"><button type="button" class="btn btn-gold" id="bstart">Start camera</button><button type="button" class="btn hidden" id="bstop">Stop</button></div>
+  <div class="field" style="margin-top:14px"><label>Or type a barcode</label>
+    <div class="actions" style="margin:0"><input type="text" id="bman" inputmode="numeric" style="max-width:260px"><button type="button" class="btn" id="bmanbtn">Add one</button></div></div>
+  <div id="bnew" class="hidden card" style="background:var(--panel2)">
+    <p><b>New barcode <span id="bcode"></span></b> – enter the details to register it.</p>
+    <div class="two"><div class="field"><label>Product name</label><input type="text" id="bname"></div><div class="field"><label>Price</label><input type="text" id="bprice" inputmode="decimal"></div></div>
+    <button type="button" class="btn btn-gold" id="bsave">Register and count 1</button>
+  </div>
+  <div id="blog"></div>
+</div>
+
+<!-- PHOTO / SCENT -->
+<form method="post" enctype="multipart/form-data" class="card hidden" id="p-photo" style="margin-bottom:20px">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="method" id="pmethod" value="photo">
+  <input type="hidden" name="signature" id="psig">
+  <h3 id="ptitle">Register by photo</h3>
+  <p class="muted" id="pnote">Take a picture of the product, then enter how many you have.</p>
+  <div class="cam"><video id="pv" muted playsinline></video><canvas id="pc" class="hidden"></canvas><div class="hint" id="phint">Camera is off</div></div>
+  <div class="actions">
+    <button type="button" class="btn" id="pstart">Start camera</button>
+    <button type="button" class="btn btn-gold hidden" id="psnap">Take photo</button>
+    <button type="button" class="btn hidden" id="pretake">Retake</button>
+    <label class="btn" style="margin:0;text-transform:none;letter-spacing:0">Choose a picture<input type="file" id="pfile" accept="image/*" capture="environment" class="hidden"></label>
+  </div>
+  <div class="two" style="margin-top:14px"><div class="field"><label>Product name</label><input type="text" name="name" required></div><div class="field"><label>Price</label><input type="text" name="price" inputmode="decimal" required></div></div>
+  <div class="field hidden" id="scentf"><label>Scent</label><input type="text" name="scent" placeholder="e.g. Lavender and vanilla"></div>
+  <div class="two"><div class="field"><label>How many (enter manually)</label><input type="text" name="stock" inputmode="numeric" value="1" required></div><div class="field"><label>Reorder level</label><input type="text" name="reorder_level" inputmode="numeric" value="5"></div></div>
+  <button class="btn btn-gold" id="psave" disabled>Save product</button>
+</form>
+
+<div class="card table"><table><tr><th>Product</th><th>Recognised by</th><th>Price</th><th>In stock</th><th>Add stock</th>{% if current_user.role=='admin' %}<th></th>{% endif %}</tr>
+{% for p in items %}<tr>
+<td>{% if p.photo %}<img class="thumb" src="{{ url_for('ws.product_photo', pid=p.id) }}" alt="">{% endif %}{{ p.name }}{% if p.scent %}<br><span class="muted">{{ p.scent }}</span>{% endif %}</td>
+<td>{{ (p.method or 'photo')|capitalize }}{% if p.barcode %}<br><span class="muted">{{ p.barcode }}</span>{% endif %}</td>
+<td>{{ '%.2f'|format(p.price) }}</td>
 <td><span class="badge {{ 'off' if p.stock <= p.reorder_level else 'ok' }}">{{ p.stock }}</span></td>
 <td><form method="post" action="{{ url_for('ws.restock', pid=p.id) }}" class="actions" style="margin:0"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="text" name="qty" inputmode="numeric" style="width:80px;padding:8px"><button class="btn btn-sm">Add</button></form></td>
 {% if current_user.role=='admin' %}<td><form method="post" action="{{ url_for('ws.product_delete', pid=p.id) }}" onsubmit="return confirm('Remove this product?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-danger">Remove</button></form></td>{% endif %}</tr>
-{% else %}<tr><td colspan="5" class="muted">No products yet.</td></tr>{% endfor %}</table></div>
+{% else %}<tr><td colspan="6" class="muted">No products yet. Pick a way to register one above.</td></tr>{% endfor %}</table></div>
+
+<script src="{{ url_for('static', filename='capture.js') }}"></script>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const scanUrl = "{{ url_for('ws.scan_in') }}";
+
+  // tabs
+  document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => {
+    document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x === b));
+    const m = b.dataset.m;
+    $('p-barcode').classList.toggle('hidden', m !== 'barcode');
+    $('p-photo').classList.toggle('hidden', m === 'barcode');
+    if (m !== 'barcode') stopBarcode();
+    if (m === 'barcode') stopPhoto();
+    if (m !== 'barcode') {
+      $('pmethod').value = m;
+      $('scentf').classList.toggle('hidden', m !== 'scent');
+      $('ptitle').textContent = m === 'scent' ? 'Register by scent' : 'Register by photo';
+      $('pnote').textContent = m === 'scent'
+        ? 'Take a picture of the product showing its scent label, describe the scent, then enter how many you have.'
+        : 'Take a picture of the product, then enter how many you have.';
+    }
+  });
+
+  // ---- barcode counting
+  let bstream = null, bstop = null;
+  const log = (t, k) => { const d = document.createElement('div'); d.className = 'toast ' + (k || ''); d.textContent = t; $('blog').prepend(d); };
+  async function handleCode(code, extra) {
+    const r = await TT.post(scanUrl, Object.assign({barcode: code}, extra || {}));
+    if (r.error) return log(r.error, 'error');
+    if (r.found) { $('bnew').classList.add('hidden'); log((r.created ? 'Registered ' : 'Counted ') + r.product.name + ' – now ' + r.product.stock + ' in stock', 'ok'); if (navigator.vibrate) navigator.vibrate(60); }
+    else { $('bcode').textContent = code; $('bnew').dataset.code = code; $('bnew').classList.remove('hidden'); $('bname').focus(); }
+  }
+  async function stopBarcode() {
+    if (bstop) { bstop(); bstop = null; }
+    TT.stopCamera(bstream, $('bv')); bstream = null;
+    $('bstart').classList.remove('hidden'); $('bstop').classList.add('hidden'); $('bhint').textContent = 'Camera is off';
+  }
+  $('bstart').onclick = async () => {
+    try {
+      bstream = await TT.startCamera($('bv'));
+      bstop = await TT.scanBarcodes($('bv'), code => handleCode(code));
+      $('bstart').classList.add('hidden'); $('bstop').classList.remove('hidden'); $('bhint').textContent = 'Scanning…';
+    } catch (e) { log(e.message, 'error'); stopBarcode(); }
+  };
+  $('bstop').onclick = stopBarcode;
+  $('bmanbtn').onclick = () => { const v = $('bman').value.trim(); if (v) { handleCode(v); $('bman').value = ''; } };
+  $('bsave').onclick = () => handleCode($('bnew').dataset.code, {name: $('bname').value, price: $('bprice').value}).then(() => { $('bname').value = ''; $('bprice').value = ''; });
+
+  // ---- photo / scent
+  let pstream = null;
+  function stopPhoto() { TT.stopCamera(pstream, $('pv')); pstream = null; $('pstart').classList.remove('hidden'); if (!$('psig').value) $('phint').textContent = 'Camera is off'; }
+  function showCaptured(canvas) {
+    $('pc').width = canvas.width; $('pc').height = canvas.height; $('pc').getContext('2d').drawImage(canvas, 0, 0);
+    $('pc').classList.remove('hidden'); $('pv').classList.add('hidden');
+    $('psig').value = TT.signature(canvas);
+    TT.toBlob(canvas).then(blob => { const dt = new DataTransfer(); dt.items.add(new File([blob], 'product.jpg', {type: 'image/jpeg'})); photoInput.files = dt.files; });
+    $('psnap').classList.add('hidden'); $('pretake').classList.remove('hidden'); $('psave').disabled = false; $('phint').textContent = 'Photo captured';
+    stopPhoto();
+  }
+  // a hidden real file input inside the form carries the picture
+  const photoInput = Object.assign(document.createElement('input'), {type: 'file', name: 'photo'}); photoInput.className = 'hidden'; $('p-photo').appendChild(photoInput);
+  $('pstart').onclick = async () => {
+    try { pstream = await TT.startCamera($('pv')); $('pv').classList.remove('hidden'); $('pc').classList.add('hidden'); $('pstart').classList.add('hidden'); $('psnap').classList.remove('hidden'); $('phint').textContent = 'Frame the product'; }
+    catch (e) { alert(e.message); }
+  };
+  $('psnap').onclick = () => showCaptured(TT.frameToCanvas($('pv')));
+  $('pretake').onclick = () => { $('psig').value = ''; $('psave').disabled = true; $('pretake').classList.add('hidden'); $('pstart').click(); };
+  $('pfile').onchange = async e => { if (e.target.files[0]) { try { showCaptured(await TT.fileToCanvas(e.target.files[0])); } catch (x) { alert(x.message); } } };
+})();
+</script>
 {% endblock %}

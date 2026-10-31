@@ -9,7 +9,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_wtf.csrf import CSRFProtect
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-VERSION = "1.3.0"
+VERSION = "1.4.0"
 
 db = SQLAlchemy()
 login_manager = LoginManager()
@@ -168,6 +168,12 @@ def _bootstrap(app):
     except (OperationalError, ProgrammingError, IntegrityError):
         db.session.rollback()
     _add_missing_columns()
+    try:
+        with db.engine.begin() as conn:
+            conn.execute(db.text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_product_barcode ON products (tenant_id, barcode)"))
+    except Exception:
+        pass
     try:
         seed_admin(app)
     except IntegrityError:
