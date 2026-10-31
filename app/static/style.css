@@ -122,3 +122,11 @@ h1,h2,h3,h4{font-weight:600}
 .cand small{color:var(--bs-secondary-color)}
 .count{font-size:2rem;font-weight:700}
 @media(max-width:575.98px){.btn-stack-sm>.btn,.btn-stack-sm>label.btn{flex:1 1 100%}}
+
+/* sizing helpers that replace inline styles */
+.mw-form{max-width:640px}.mw-form-sm{max-width:520px}.mw-field{max-width:260px}.mw-input{max-width:380px}
+.w-pay{min-width:190px;max-width:240px}.w-qty{min-width:150px;max-width:180px}
+.menu-wide{min-width:230px}.menu-email{max-width:260px}
+.logo-md{height:44px}.logo-lg{height:56px}.img-banner{max-height:200px;object-fit:cover}
+.mark-avatar{flex-basis:32px;width:32px;height:32px;border-radius:50%}
+.text-capitalize-none{text-transform:none}

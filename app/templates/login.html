@@ -18,7 +18,7 @@
     <div class="theme-corner">{{ theme_menu() }}</div>
     <form class="auth-card" method="post" autocomplete="on">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      {% if tenant %}<div class="d-flex align-items-center gap-3 mb-4">{% if b and b.logo %}<img class="logo" style="height:44px" src="{{ url_for('tenant_public.login_logo', slug=tenant.slug) }}?v={{ b.updated_at.timestamp()|int }}" alt="">{% else %}<span class="mark mark-lg">{{ tenant.name[0]|upper }}</span>{% endif %}<span class="fs-5 fw-semibold">{{ tenant.name }}</span></div>
+      {% if tenant %}<div class="d-flex align-items-center gap-3 mb-4">{% if b and b.logo %}<img class="logo logo-md" src="{{ url_for('tenant_public.login_logo', slug=tenant.slug) }}?v={{ b.updated_at.timestamp()|int }}" alt="">{% else %}<span class="mark mark-lg">{{ tenant.name[0]|upper }}</span>{% endif %}<span class="fs-5 fw-semibold">{{ tenant.name }}</span></div>
       <h2 class="h3 mb-1">Sign in</h2>
       <p class="text-body-secondary mb-4">to the {{ tenant.name }} workspace</p>{% else %}<h2 class="h3 mb-1">Welcome back</h2>
       <p class="text-body-secondary mb-4">Sign in to continue to your workspace.</p>{% endif %}
