@@ -83,7 +83,7 @@
   $('manbtn').onclick = () => { const v = $('man').value.trim(); if (v) match({barcode: v}); };
   $('scan').onclick = async () => {
     if (stopScan) { stopScan(); stopScan = null; $('scan').textContent = 'Scan barcode'; return; }
-    try { stopScan = await TT.scanBarcodes($('v'), code => { match({barcode: code}); }); $('scan').textContent = 'Stop scanning'; $('hint').textContent = 'Scanning…'; }
+    try { stopScan = await TT.scanBarcodes($('v'), code => { match({barcode: code}); }, t => $('hint').textContent = t); $('scan').textContent = 'Stop scanning'; $('hint').textContent = 'Hold the barcode in view'; }
     catch (e) { say(e.message, 'error'); }
   };
 

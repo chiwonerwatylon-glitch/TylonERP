@@ -95,8 +95,8 @@
   $('bstart').onclick = async () => {
     try {
       bstream = await TT.startCamera($('bv'));
-      bstop = await TT.scanBarcodes($('bv'), code => handleCode(code));
-      $('bstart').classList.add('hidden'); $('bstop').classList.remove('hidden'); $('bhint').textContent = 'Scanning…';
+      bstop = await TT.scanBarcodes($('bv'), code => handleCode(code), t => $('bhint').textContent = t);
+      $('bstart').classList.add('hidden'); $('bstop').classList.remove('hidden'); $('bhint').textContent = 'Hold the barcode inside the box';
     } catch (e) { log(e.message, 'error'); stopBarcode(); }
   };
   $('bstop').onclick = stopBarcode;
