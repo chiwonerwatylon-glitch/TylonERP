@@ -9,7 +9,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_wtf.csrf import CSRFProtect
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-VERSION = "1.5.0"
+VERSION = "1.6.0"
 
 db = SQLAlchemy()
 login_manager = LoginManager()
@@ -104,7 +104,7 @@ def create_app():
     @app.context_processor
     def inject_globals():
         return {"app_version": VERSION, "plans": models.PLANS, "now": datetime.utcnow(),
-                "theme_style": _theme_style()}
+                "theme_style": _theme_style(), "auth_colors": _auth_colors()}
 
     @app.get("/healthz")
     def healthz():
@@ -127,33 +127,47 @@ def _lum(h):
     return 0.2126 * r + 0.7152 * g_ + 0.0722 * b
 
 
-def _theme_style():
-    """CSS variable overrides for the tenant whose pages are being shown."""
+def _tenant_for_theme():
     from flask_login import current_user
     from .models import Tenant
 
-    tenant = None
     if current_user.is_authenticated and not current_user.is_superadmin:
-        tenant = current_user.tenant
-    elif g.get("slug"):
-        tenant = Tenant.query.filter_by(slug=g.slug).first()
+        return current_user.tenant
+    if g.get("slug"):
+        return Tenant.query.filter_by(slug=g.slug).first()
+    return None
+
+
+def _rgb(h):
+    return ",".join(str(int(h[i:i + 2], 16)) for i in (1, 3, 5))
+
+
+def _theme_style():
+    """The tenant's accent colour, applied on top of Bootstrap's theme in both light and dark mode."""
+    tenant = _tenant_for_theme()
     b = tenant.branding if tenant else None
-    if not b:
+    if not b or not b.accent:
         return ""
-    css = []
-    if b.accent:
-        css += [f"--gold:{b.accent}", f"--gold2:{_mix(b.accent, '#ffffff', .35)}",
-                f"--on-gold:{'#10131c' if _lum(b.accent) > .5 else '#ffffff'}"]
-    if b.background:
-        css += [f"--bg:{b.background}"]
-    if b.panel:
-        toward = "#000000" if _lum(b.panel) > .55 else "#ffffff"
-        css += [f"--panel:{b.panel}", f"--panel2:{_mix(b.panel, toward, .06)}", f"--line:{_mix(b.panel, toward, .14)}"]
-    if b.background or b.panel:
-        light = _lum(b.panel or b.background) > .55
-        if light:
-            css += ["--text:#161b2e", "--muted:#5b6682"]
-    return ":root{" + ";".join(css) + "}" if css else ""
+    a = b.accent
+    return (":root,[data-bs-theme]{--bs-primary:%s;--bs-primary-rgb:%s;--bs-link-color:%s;--bs-link-color-rgb:%s;"
+            "--bs-link-hover-color:%s;--bs-link-hover-color-rgb:%s;--on-primary:%s;--hero-a:%s;--hero-b:%s}"
+            % (a, _rgb(a), a, _rgb(a), _mix(a, "#000000", .2), _rgb(_mix(a, "#000000", .2)),
+               "#10131c" if _lum(a) > .6 else "#ffffff", a, _mix(a, "#000000", .45)))
+
+
+def _auth_colors():
+    """The tenant's own background and panel colours; they style the sign-in page only."""
+    tenant = _tenant_for_theme()
+    b = tenant.branding if tenant else None
+    if not b or not (b.background or b.panel):
+        return None
+    panel = b.panel or b.background
+    bg = b.background or b.panel
+    light = _lum(panel) > .55
+    return {"bg": bg, "panel": panel, "mode": "light" if light else "dark",
+            "text": "#161b2e" if light else "#e8ecf6", "muted": "#5b6682" if light else "#8d99b8",
+            "line": _mix(panel, "#000000" if light else "#ffffff", .16),
+            "hero_text": "#161b2e" if _lum(bg) > .55 else "#ffffff", "hero_b": _mix(bg, "#000000", .3)}
 
 
 def _bootstrap(app):

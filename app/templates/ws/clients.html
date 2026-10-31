@@ -1,10 +1,10 @@
 {% extends "shell.html" %}
 {% block content %}
-<div class="head"><h1>Clients</h1></div>
-<form method="post" class="card" style="margin-bottom:20px"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-<div class="two"><div class="field"><label>Name</label><input type="text" name="name" required></div><div class="field"><label>Phone</label><input type="text" name="phone"></div></div>
-<div class="field"><label>Email</label><input type="email" name="email"></div><button class="btn btn-gold">Add client</button></form>
-<div class="card table"><table><tr><th>Client</th><th>Contact</th><th>Owes</th></tr>
-{% for c in items %}<tr><td>{{ c.name }}</td><td class="muted">{{ c.phone or '' }} {{ c.email or '' }}</td><td>{% if c.balance > 0 %}<span class="badge off">{{ '%.2f'|format(c.balance) }}</span>{% else %}<span class="badge ok">Clear</span>{% endif %}</td></tr>
-{% else %}<tr><td colspan="3" class="muted">No clients yet.</td></tr>{% endfor %}</table></div>
+<div class="page-head"><h1>Clients</h1></div>
+<form method="post" class="card card-body mb-3"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<div class="row g-3 mb-3"><div class="col-md-6"><label class="form-label">Name</label><input class="form-control" type="text" name="name" required></div><div class="col-md-6"><label class="form-label">Phone</label><input class="form-control" type="text" name="phone"></div></div>
+<div class="mb-3"><label class="form-label">Email</label><input class="form-control" type="email" name="email"></div><button class="btn btn-primary align-self-start">Add client</button></form>
+<div class="card"><div class="table-responsive"><table class="table align-middle mb-0"><thead><tr><th>Client</th><th>Contact</th><th>Owes</th></tr></thead><tbody>
+{% for c in items %}<tr><td class="fw-semibold">{{ c.name }}</td><td class="text-body-secondary">{{ c.phone or '' }} {{ c.email or '' }}</td><td>{% if c.balance > 0 %}<span class="badge text-bg-danger">{{ '%.2f'|format(c.balance) }}</span>{% else %}<span class="badge text-bg-success">Clear</span>{% endif %}</td></tr>
+{% else %}<tr><td colspan="3" class="text-body-secondary">No clients yet.</td></tr>{% endfor %}</tbody></table></div></div>
 {% endblock %}

@@ -1,14 +1,14 @@
 {% extends "shell.html" %}
 {% block content %}
-<div class="head"><h1>Overview</h1><a class="btn btn-gold" href="{{ url_for('admin.tenant_new') }}">Register tenant</a></div>
-<div class="grid">
-  <div class="stat"><span>Tenants</span><b>{{ stats.total }}</b></div>
-  <div class="stat"><span>Active</span><b>{{ stats.active }}</b></div>
-  <div class="stat"><span>Tenant users</span><b>{{ stats.users }}</b></div>
-  <div class="stat"><span>On paid plans</span><b>{{ stats.paid }}</b></div>
+<div class="page-head"><h1>Overview</h1><a class="btn btn-primary" href="{{ url_for('admin.tenant_new') }}">Register tenant</a></div>
+<div class="row g-3 mb-3">
+  <div class="col-6 col-lg-3"><div class="card stat h-100"><div class="k">Tenants</div><div class="v">{{ stats.total }}</div></div></div>
+  <div class="col-6 col-lg-3"><div class="card stat h-100"><div class="k">Active</div><div class="v">{{ stats.active }}</div></div></div>
+  <div class="col-6 col-lg-3"><div class="card stat h-100"><div class="k">Tenant users</div><div class="v">{{ stats.users }}</div></div></div>
+  <div class="col-6 col-lg-3"><div class="card stat h-100"><div class="k">On paid plans</div><div class="v">{{ stats.paid }}</div></div></div>
 </div>
-<div class="card table"><table><tr><th>Recent tenants</th><th>Plan</th><th>Status</th></tr>
-{% for t in tenants %}<tr><td><a href="{{ url_for('admin.tenant_detail', tenant_id=t.id) }}">{{ t.name }}</a></td><td>{{ t.plan_label }}</td>
-<td><span class="badge {{ 'ok' if t.is_active else 'off' }}">{{ 'Active' if t.is_active else 'Suspended' }}</span></td></tr>
-{% else %}<tr><td colspan="3" class="muted">No tenants yet. Register your first one.</td></tr>{% endfor %}</table></div>
+<div class="card"><div class="table-responsive"><table class="table table-hover align-middle mb-0"><thead><tr><th>Recent tenants</th><th>Plan</th><th>Status</th></tr></thead><tbody>
+{% for t in tenants %}<tr><td><a class="fw-semibold text-decoration-none" href="{{ url_for('admin.tenant_detail', tenant_id=t.id) }}">{{ t.name }}</a></td><td>{{ t.plan_label }}</td>
+<td><span class="badge text-bg-{{ 'success' if t.is_active else 'danger' }}">{{ 'Active' if t.is_active else 'Suspended' }}</span></td></tr>
+{% else %}<tr><td colspan="3" class="text-body-secondary">No tenants yet. Register your first one.</td></tr>{% endfor %}</tbody></table></div></div>
 {% endblock %}

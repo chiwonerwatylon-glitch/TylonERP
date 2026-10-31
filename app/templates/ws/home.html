@@ -1,17 +1,18 @@
 {% extends "shell.html" %}
+{% from "_ui.html" import ico %}
 {% block content %}
-<div class="head"><h1>{{ tenant.name }}</h1><span class="badge gold">{{ tenant.plan_label }} plan</span></div>
-<a class="btn btn-gold big btn-block" href="{{ url_for('ws.quick_sell') }}" style="margin-bottom:22px;text-align:center">Quick sell – scan or snap a product</a>
-<div class="grid">
-  <div class="stat"><span>Revenue, last 30 days</span><b>{{ '%.2f'|format(stats.revenue) }}</b></div>
-  <div class="stat"><span>Owed by debtors</span><b>{{ '%.2f'|format(stats.owed) }}</b></div>
-  <div class="stat"><span>Products</span><b>{{ stats.products }}</b></div>
-  <div class="stat"><span>Clients</span><b>{{ stats.clients }}</b></div>
+<div class="page-head"><h1>{{ tenant.name }}</h1><span class="badge text-bg-primary">{{ tenant.plan_label }} plan</span></div>
+<a class="btn btn-primary btn-lg w-100 mb-3 d-flex align-items-center justify-content-center gap-2" href="{{ url_for('ws.quick_sell') }}">{{ ico('bolt') }} Quick sell – scan or snap a product</a>
+<div class="row g-3 mb-3">
+  <div class="col-6 col-lg-3"><div class="card stat h-100"><div class="k">Revenue, last 30 days</div><div class="v">{{ '%.2f'|format(stats.revenue) }}</div></div></div>
+  <div class="col-6 col-lg-3"><div class="card stat h-100"><div class="k">Owed by debtors</div><div class="v">{{ '%.2f'|format(stats.owed) }}</div></div></div>
+  <div class="col-6 col-lg-3"><div class="card stat h-100"><div class="k">Products</div><div class="v">{{ stats.products }}</div></div></div>
+  <div class="col-6 col-lg-3"><div class="card stat h-100"><div class="k">Clients</div><div class="v">{{ stats.clients }}</div></div></div>
 </div>
-<div class="two" style="align-items:start">
-<div class="card table"><table><tr><th>Low stock</th><th>Left</th></tr>
-{% for p in low %}<tr><td>{{ p.name }}</td><td><span class="badge off">{{ p.stock }}</span></td></tr>{% else %}<tr><td colspan="2" class="muted">Stock levels are healthy.</td></tr>{% endfor %}</table></div>
-<div class="card table"><table><tr><th>Latest sales</th><th>Total</th></tr>
-{% for s in latest %}<tr><td>{{ s.product_name }} &times; {{ s.quantity }}</td><td>{{ '%.2f'|format(s.total) }}</td></tr>{% else %}<tr><td colspan="2" class="muted">No sales yet.</td></tr>{% endfor %}</table></div>
+<div class="row g-3">
+<div class="col-lg-6"><div class="card h-100"><div class="table-responsive"><table class="table align-middle mb-0"><thead><tr><th>Low stock</th><th class="text-end">Left</th></tr></thead><tbody>
+{% for p in low %}<tr><td>{{ p.name }}</td><td class="text-end"><span class="badge text-bg-danger">{{ p.stock }}</span></td></tr>{% else %}<tr><td colspan="2" class="text-body-secondary">Stock levels are healthy.</td></tr>{% endfor %}</tbody></table></div></div></div>
+<div class="col-lg-6"><div class="card h-100"><div class="table-responsive"><table class="table align-middle mb-0"><thead><tr><th>Latest sales</th><th class="text-end">Total</th></tr></thead><tbody>
+{% for s in latest %}<tr><td>{{ s.product_name }} &times; {{ s.quantity }}</td><td class="text-end">{{ '%.2f'|format(s.total) }}</td></tr>{% else %}<tr><td colspan="2" class="text-body-secondary">No sales yet.</td></tr>{% endfor %}</tbody></table></div></div></div>
 </div>
 {% endblock %}
