@@ -1,0 +1,15 @@
+{% extends "shell.html" %}
+{% block content %}
+<div class="head"><h1>Stock</h1></div>
+<form method="post" class="card" style="margin-bottom:20px"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<div class="two"><div class="field"><label>Product</label><input type="text" name="name" required></div><div class="field"><label>SKU</label><input type="text" name="sku"></div></div>
+<div class="two"><div class="field"><label>Price</label><input type="text" name="price" inputmode="decimal" required></div><div class="field"><label>Opening stock</label><input type="text" name="stock" inputmode="numeric" value="0"></div></div>
+<div class="field"><label>Reorder level</label><input type="text" name="reorder_level" inputmode="numeric" value="5" style="max-width:200px"></div>
+<button class="btn btn-gold">Add product</button></form>
+<div class="card table"><table><tr><th>Product</th><th>Price</th><th>In stock</th><th>Restock</th>{% if current_user.role=='admin' %}<th></th>{% endif %}</tr>
+{% for p in items %}<tr><td>{{ p.name }}<br><span class="muted">{{ p.sku or '' }}</span></td><td>{{ '%.2f'|format(p.price) }}</td>
+<td><span class="badge {{ 'off' if p.stock <= p.reorder_level else 'ok' }}">{{ p.stock }}</span></td>
+<td><form method="post" action="{{ url_for('ws.restock', pid=p.id) }}" class="actions" style="margin:0"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="text" name="qty" inputmode="numeric" style="width:80px;padding:8px"><button class="btn btn-sm">Add</button></form></td>
+{% if current_user.role=='admin' %}<td><form method="post" action="{{ url_for('ws.product_delete', pid=p.id) }}" onsubmit="return confirm('Remove this product?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-danger">Remove</button></form></td>{% endif %}</tr>
+{% else %}<tr><td colspan="5" class="muted">No products yet.</td></tr>{% endfor %}</table></div>
+{% endblock %}

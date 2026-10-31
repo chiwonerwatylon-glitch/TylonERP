@@ -1,0 +1,16 @@
+{% extends "shell.html" %}
+{% block content %}
+<div class="head"><h1>{{ tenant.name }}</h1><span class="badge gold">{{ tenant.plan_label }} plan</span></div>
+<div class="grid">
+  <div class="stat"><span>Revenue, last 30 days</span><b>{{ '%.2f'|format(stats.revenue) }}</b></div>
+  <div class="stat"><span>Owed by debtors</span><b>{{ '%.2f'|format(stats.owed) }}</b></div>
+  <div class="stat"><span>Products</span><b>{{ stats.products }}</b></div>
+  <div class="stat"><span>Clients</span><b>{{ stats.clients }}</b></div>
+</div>
+<div class="two" style="align-items:start">
+<div class="card table"><table><tr><th>Low stock</th><th>Left</th></tr>
+{% for p in low %}<tr><td>{{ p.name }}</td><td><span class="badge off">{{ p.stock }}</span></td></tr>{% else %}<tr><td colspan="2" class="muted">Stock levels are healthy.</td></tr>{% endfor %}</table></div>
+<div class="card table"><table><tr><th>Latest sales</th><th>Total</th></tr>
+{% for s in latest %}<tr><td>{{ s.product_name }} &times; {{ s.quantity }}</td><td>{{ '%.2f'|format(s.total) }}</td></tr>{% else %}<tr><td colspan="2" class="muted">No sales yet.</td></tr>{% endfor %}</table></div>
+</div>
+{% endblock %}

@@ -1,0 +1,13 @@
+{% extends "shell.html" %}
+{% block content %}
+<div class="head"><h1>Sales</h1></div>
+<form method="post" class="card" style="margin-bottom:20px"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<div class="two"><div class="field"><label>Product</label><select name="product_id" required><option value="">Choose</option>{% for p in products %}<option value="{{ p.id }}">{{ p.name }} ({{ p.stock }} left, {{ '%.2f'|format(p.price) }})</option>{% endfor %}</select></div>
+<div class="field"><label>Quantity</label><input type="text" name="quantity" inputmode="numeric" value="1" required></div></div>
+<div class="two"><div class="field"><label>Client (optional for cash sales)</label><select name="client_id"><option value="">Walk-in</option>{% for c in clients %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}</select></div>
+<div class="field"><label>Amount paid (blank = paid in full)</label><input type="text" name="paid" inputmode="decimal"></div></div>
+<button class="btn btn-gold">Record sale</button></form>
+<div class="card table"><table><tr><th>Date</th><th>Item</th><th>Client</th><th>Total</th><th>Balance</th></tr>
+{% for s in items %}<tr><td>{{ s.created_at.strftime('%d %b %H:%M') }}</td><td>{{ s.product_name }} &times; {{ s.quantity }}</td><td>{{ s.client.name if s.client else 'Walk-in' }}</td><td>{{ '%.2f'|format(s.total) }}</td><td>{% if s.balance > 0 %}<span class="badge off">{{ '%.2f'|format(s.balance) }}</span>{% else %}<span class="badge ok">Paid</span>{% endif %}</td></tr>
+{% else %}<tr><td colspan="5" class="muted">No sales yet.</td></tr>{% endfor %}</table></div>
+{% endblock %}
