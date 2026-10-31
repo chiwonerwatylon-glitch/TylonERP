@@ -2,13 +2,22 @@
 {% block body %}
 <div class="shell">
   <aside class="side">
-    <div class="brand"><span class="mark">T</span>TylonERP</div>
+    <div class="brand"><span class="mark">{{ (current_user.tenant.name[0] if current_user.tenant else "T")|upper }}</span>{{ current_user.tenant.name if current_user.tenant else "TylonERP" }}</div>
     {% if current_user.is_superadmin %}
     <a class="nav {{ 'on' if request.endpoint=='admin.dashboard' }}" href="{{ url_for('admin.dashboard') }}">Overview</a>
     <a class="nav {{ 'on' if request.endpoint and request.endpoint.startswith('admin.tenant') }}" href="{{ url_for('admin.tenants') }}">Tenants</a>
     <a class="nav {{ 'on' if request.endpoint=='admin.system' }}" href="{{ url_for('admin.system') }}">System</a>
     {% else %}
-    <a class="nav on" href="{{ url_for('main.home') }}">Home</a>
+    {% set ep = request.endpoint or '' %}
+    <a class="nav {{ 'on' if ep=='ws.home' }}" href="{{ url_for('ws.home') }}">Dashboard</a>
+    <a class="nav {{ 'on' if ep=='ws.products' }}" href="{{ url_for('ws.products') }}">Stock</a>
+    <a class="nav {{ 'on' if ep=='ws.clients' }}" href="{{ url_for('ws.clients') }}">Clients</a>
+    <a class="nav {{ 'on' if ep=='ws.sales' }}" href="{{ url_for('ws.sales') }}">Sales</a>
+    <a class="nav {{ 'on' if ep=='ws.debtors' }}" href="{{ url_for('ws.debtors') }}">Debtors</a>
+    {% if current_user.role == 'admin' %}
+    <a class="nav {{ 'on' if ep=='ws.members' }}" href="{{ url_for('ws.members') }}">Members</a>
+    <a class="nav {{ 'on' if ep=='ws.branding' }}" href="{{ url_for('ws.branding') }}">Login page</a>
+    {% endif %}
     {% endif %}
     <a class="nav" href="{{ url_for('auth.change_password') }}">Password</a>
     <div class="spacer"></div>

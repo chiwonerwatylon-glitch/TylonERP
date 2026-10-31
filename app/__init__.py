@@ -7,7 +7,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_wtf.csrf import CSRFProtect
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 
 db = SQLAlchemy()
 login_manager = LoginManager()
@@ -43,10 +43,14 @@ def create_app():
 
     from . import models
     from .routes import admin_bp, auth_bp, main_bp
+    from .workspace import public_bp, ws_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(admin_bp, url_prefix="/admin")
     app.register_blueprint(main_bp)
+    app.register_blueprint(ws_bp)
+    app.register_blueprint(public_bp)
+    app.config["MAX_CONTENT_LENGTH"] = 4 * 1024 * 1024
 
     @app.context_processor
     def inject_globals():

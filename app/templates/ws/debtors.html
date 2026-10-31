@@ -1,0 +1,8 @@
+{% extends "shell.html" %}
+{% block content %}
+<div class="head"><h1>Debtors</h1><span class="badge off">Owed {{ '%.2f'|format(total) }}</span></div>
+<div class="card table"><table><tr><th>Client</th><th>Sale</th><th>Balance</th><th>Record payment</th></tr>
+{% for s in items %}<tr><td>{{ s.client.name }}</td><td>{{ s.product_name }} &times; {{ s.quantity }}<br><span class="muted">{{ s.created_at.strftime('%d %b %Y') }}</span></td><td>{{ '%.2f'|format(s.balance) }}</td>
+<td><form method="post" action="{{ url_for('ws.payment', sid=s.id) }}" class="actions" style="margin:0"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="text" name="amount" inputmode="decimal" style="width:110px;padding:8px"><button class="btn btn-sm">Pay</button></form></td></tr>
+{% else %}<tr><td colspan="4" class="muted">Nobody owes you anything.</td></tr>{% endfor %}</table></div>
+{% endblock %}

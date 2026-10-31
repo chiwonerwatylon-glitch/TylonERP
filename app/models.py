@@ -76,3 +76,64 @@ class User(UserMixin, db.Model):
 @login_manager.user_loader
 def load_user(user_id):
     return db.session.get(User, int(user_id))
+
+
+class TenantBranding(db.Model):
+    """Per-tenant login look. Image bytes live in the DB so they survive redeploys."""
+    __tablename__ = "tenant_branding"
+    tenant_id = db.Column(db.Integer, db.ForeignKey("tenants.id", ondelete="CASCADE"), primary_key=True)
+    headline = db.Column(db.String(120))
+    tagline = db.Column(db.String(240))
+    image = db.Column(db.LargeBinary)
+    image_mime = db.Column(db.String(40))
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    tenant = db.relationship("Tenant", backref=db.backref("branding", uselist=False, cascade="all, delete-orphan"))
+
+
+class Product(db.Model):
+    __tablename__ = "products"
+    id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(db.Integer, db.ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True)
+    name = db.Column(db.String(150), nullable=False)
+    sku = db.Column(db.String(60))
+    price = db.Column(db.Numeric(12, 2), nullable=False, default=0)
+    stock = db.Column(db.Integer, nullable=False, default=0)
+    reorder_level = db.Column(db.Integer, nullable=False, default=5)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+
+class Client(db.Model):
+    __tablename__ = "clients"
+    id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(db.Integer, db.ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True)
+    name = db.Column(db.String(150), nullable=False)
+    email = db.Column(db.String(255))
+    phone = db.Column(db.String(40))
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    sales = db.relationship("Sale", backref="client")
+
+    @property
+    def balance(self):
+        return sum((s.balance for s in self.sales), 0)
+
+
+class Sale(db.Model):
+    __tablename__ = "sales"
+    id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(db.Integer, db.ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True)
+    client_id = db.Column(db.Integer, db.ForeignKey("clients.id", ondelete="SET NULL"))
+    product_id = db.Column(db.Integer, db.ForeignKey("products.id", ondelete="SET NULL"))
+    product_name = db.Column(db.String(150), nullable=False)
+    quantity = db.Column(db.Integer, nullable=False)
+    unit_price = db.Column(db.Numeric(12, 2), nullable=False)
+    paid = db.Column(db.Numeric(12, 2), nullable=False, default=0)
+    created_by = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"))
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+
+    @property
+    def total(self):
+        return self.quantity * self.unit_price
+
+    @property
+    def balance(self):
+        return self.total - self.paid

@@ -13,7 +13,7 @@ h1,h2,h3{font-family:Fraunces,Georgia,serif;font-weight:600;letter-spacing:-.01e
 .hero-copy{position:relative;z-index:1;max-width:460px}
 .hero-copy h1{font-size:2.9rem;line-height:1.1;margin-bottom:18px}
 .hero-copy h1 em{font-style:italic;color:var(--gold2)}
-.hero-copy p{color:var(--muted);line-height:1.65;font-size:1.02rem}
+.hero-copy p{color:#c3cce3;line-height:1.65;font-size:1.02rem}
 .hero-foot{position:relative;z-index:1;color:var(--muted);font-size:.85rem}
 .auth-form{display:grid;place-items:center;padding:40px 24px;background:var(--panel)}
 .card-login{width:100%;max-width:400px}

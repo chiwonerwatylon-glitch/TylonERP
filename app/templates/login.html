@@ -1,14 +1,15 @@
 {% extends "base.html" %}
-{% block title %}Sign in · TylonERP{% endblock %}
+{% block title %}Sign in · {{ tenant.name if tenant else "TylonERP" }}{% endblock %}
 {% block body %}
 <div class="auth">
-  <section class="auth-hero">
-    <div class="brand"><span class="mark">T</span>TylonERP</div>
+  {% set b = tenant.branding if tenant else None %}
+  <section class="auth-hero"{% if b and b.image %} style="background-image:linear-gradient(160deg,rgba(8,12,26,.72),rgba(8,12,26,.35)),url('{{ url_for('tenant_public.login_image', slug=tenant.slug) }}?v={{ b.updated_at.timestamp()|int }}');background-size:cover;background-position:center"{% endif %}>
+    <div class="brand"><span class="mark">{{ (tenant.name[0] if tenant else "T")|upper }}</span>{{ tenant.name if tenant else "TylonERP" }}</div>
     <div class="hero-copy">
-      <h1>Run every business <em>from one place.</em></h1>
-      <p>Stock, sales and debtors for each of your organisations, managed together with calm and clarity.</p>
+      {% if b and b.headline %}<h1>{{ b.headline }}</h1>{% elif tenant %}<h1>Welcome to <em>{{ tenant.name }}</em></h1>{% else %}<h1>Run every business <em>from one place.</em></h1>{% endif %}
+      <p>{{ b.tagline if b and b.tagline else ("Sign in to your team workspace." if tenant else "Stock, sales and debtors for each of your organisations, managed together with calm and clarity.") }}</p>
     </div>
-    <div class="hero-foot">&copy; {{ now.year }} TylonERP &middot; v{{ app_version }}</div>
+    <div class="hero-foot">{% if tenant %}Powered by TylonERP{% else %}&copy; {{ now.year }} TylonERP{% endif %} &middot; v{{ app_version }}</div>
   </section>
   <section class="auth-form">
     <form class="card-login" method="post" autocomplete="on">

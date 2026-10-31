@@ -1,0 +1,13 @@
+{% extends "shell.html" %}
+{% block content %}
+<div class="head"><h1>Login page</h1><a class="btn btn-sm" target="_blank" href="{{ url_for('auth.login', slug=tenant.slug) }}">Preview</a></div>
+<form method="post" enctype="multipart/form-data" class="card form">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<p class="muted">Your team signs in at <b>{{ url_for('auth.login', slug=tenant.slug, _external=True) }}</b></p>
+{% if b and b.image %}<img src="{{ url_for('tenant_public.login_image', slug=tenant.slug) }}?v={{ b.updated_at.timestamp()|int }}" alt="" style="width:100%;max-height:200px;object-fit:cover;border-radius:12px;margin-bottom:14px">{% endif %}
+<div class="field"><label>Background picture (PNG, JPEG or WebP, max 2 MB)</label><input type="file" name="image" accept="image/png,image/jpeg,image/webp"></div>
+{% if b and b.image %}<div class="field"><label style="text-transform:none;letter-spacing:0"><input type="checkbox" name="remove_image"> Remove current picture</label></div>{% endif %}
+<div class="field"><label>Headline</label><input type="text" name="headline" maxlength="120" value="{{ b.headline if b and b.headline else '' }}"></div>
+<div class="field"><label>Tagline</label><input type="text" name="tagline" maxlength="240" value="{{ b.tagline if b and b.tagline else '' }}"></div>
+<button class="btn btn-gold">Save</button></form>
+{% endblock %}

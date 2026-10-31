@@ -36,13 +36,15 @@ def _safe_next(target):
 
 
 def _home_for(user):
-    return url_for("admin.dashboard") if user.is_superadmin else url_for("main.home")
+    return url_for("admin.dashboard") if user.is_superadmin else url_for("ws.home")
 
 
 # ---------------------------------------------------------------- auth
 
 @auth_bp.route("/login", methods=["GET", "POST"])
-def login():
+@auth_bp.route("/t/<slug>", methods=["GET", "POST"])
+def login(slug=None):
+    tenant = Tenant.query.filter_by(slug=slug).first_or_404() if slug else None
     if current_user.is_authenticated:
         return redirect(_home_for(current_user))
     if request.method == "POST":
@@ -51,6 +53,8 @@ def login():
         user = User.query.filter_by(email=email).first()
         if user and user.is_locked():
             flash("Too many failed attempts. Try again in a few minutes.", "error")
+        elif user and user.check_password(password) and tenant and user.tenant_id != tenant.id:
+            flash("Incorrect email or password.", "error")
         elif user and user.check_password(password):
             if not user.is_active:
                 flash("This account is disabled. Contact your administrator.", "error")
@@ -69,14 +73,15 @@ def login():
                     user.failed_attempts = 0
                 db.session.commit()
             flash("Incorrect email or password.", "error")
-    return render_template("login.html")
+    return render_template("login.html", tenant=tenant)
 
 
 @auth_bp.post("/logout")
 @login_required
 def logout():
+    slug = current_user.tenant.slug if current_user.tenant else None
     logout_user()
-    return redirect(url_for("auth.login"))
+    return redirect(url_for("auth.login", slug=slug) if slug else url_for("auth.login"))
 
 
 @auth_bp.route("/password", methods=["GET", "POST"])
@@ -105,16 +110,6 @@ def index():
     if current_user.is_authenticated:
         return redirect(_home_for(current_user))
     return redirect(url_for("auth.login"))
-
-
-@main_bp.get("/app")
-@login_required
-def home():
-    if current_user.is_superadmin:
-        return redirect(url_for("admin.dashboard"))
-    if current_user.must_change_password:
-        return redirect(url_for("auth.change_password"))
-    return render_template("home.html", tenant=current_user.tenant)
 
 
 # ---------------------------------------------------------------- admin
