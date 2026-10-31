@@ -120,24 +120,197 @@ def home():
 
 # ------------------------------------------------------------ products
 
+MAX_PHOTO = 1024 * 1024
+SIG_RE = re.compile(r"^[0-9a-f]{70}$")
+DUPLICATE_SCORE = 0.12  # lower = more alike; below this a photo counts as the same product
+
+
+def _sniff(data):
+    mime = next((m for sig, m in IMAGE_TYPES.items() if data.startswith(sig)), None)
+    if mime == "image/webp" and data[8:12] != b"WEBP":
+        return None
+    return mime
+
+
+def signature_score(a, b):
+    """0 = identical look, 1 = completely different. Mixes shape (dHash) and colour."""
+    if not a or not b or len(a) != 70 or len(b) != 70:
+        return 1.0
+    shape = bin(int(a[:16], 16) ^ int(b[:16], 16)).count("1") / 64
+    ca = [int(a[16 + i:18 + i], 16) for i in range(0, 54, 2)]
+    cb = [int(b[16 + i:18 + i], 16) for i in range(0, 54, 2)]
+    colour = sum(abs(x - y) for x, y in zip(ca, cb)) / (54 * 255)
+    return 0.4 * shape + 0.6 * min(1.0, colour * 3)
+
+
+def _product_json(p, score=None):
+    d = {"id": p.id, "name": p.name, "price": str(p.price), "stock": p.stock,
+         "method": p.method, "scent": p.scent, "barcode": p.barcode,
+         "photo": url_for("ws.product_photo", pid=p.id) if p.photo else None}
+    if score is not None:
+        d["match"] = max(0, round((1 - score) * 100))
+    return d
+
+
+def _best_matches(sig, limit=5):
+    scored = [(signature_score(sig, p.signature), p)
+              for p in Product.query.filter(Product.tenant_id == tid(), Product.signature.isnot(None)).all()]
+    scored.sort(key=lambda t: t[0])
+    return [(sc, p) for sc, p in scored[:limit] if sc < 0.45]
+
+
+@ws_bp.get("/products/<int:pid>/photo")
+@tenant_user
+def product_photo(pid):
+    p = Product.query.filter_by(id=pid, tenant_id=tid()).first_or_404()
+    if not p.photo:
+        abort(404)
+    return Response(p.photo, mimetype=p.photo_mime, headers={"Cache-Control": "private, max-age=300"})
+
+
 @ws_bp.route("/products", methods=["GET", "POST"])
 @tenant_user
 def products():
     if request.method == "POST":
         f = request.form
+        method = f.get("method", "photo")
         name = f.get("name", "").strip()
-        price, stock = money(f.get("price")), integer(f.get("stock"), 0)
-        reorder = integer(f.get("reorder_level"), 5)
-        if not name or price is None:
-            flash("Product name and a valid price are required.", "error")
+        price = money(f.get("price"))
+        stock = integer(f.get("stock"), 0)
+        barcode = f.get("barcode", "").strip() or None
+        scent = f.get("scent", "").strip() or None
+        sig = f.get("signature", "").strip().lower() or None
+        file = request.files.get("photo")
+        data = file.read(MAX_PHOTO + 1) if file and file.filename else b""
+        error = None
+        if method not in ("barcode", "photo", "scent"):
+            error = "Choose how this product is recognised."
+        elif not name or price is None:
+            error = "Product name and a valid price are required."
+        elif method == "barcode" and not barcode:
+            error = "Scan or type the barcode."
+        elif method == "scent" and not scent:
+            error = "Describe the scent."
+        elif method in ("photo", "scent") and not data:
+            error = "Take a photo of the product."
+        elif data and (len(data) > MAX_PHOTO or not _sniff(data)):
+            error = "The photo must be a PNG, JPEG or WebP under 1 MB."
+        elif sig and not SIG_RE.match(sig):
+            error = "Photo signature is invalid. Take the photo again."
+        elif method in ("photo", "scent") and not sig:
+            error = "Photo could not be analysed. Take the photo again."
+        elif barcode and Product.query.filter_by(tenant_id=tid(), barcode=barcode).first():
+            dup = Product.query.filter_by(tenant_id=tid(), barcode=barcode).first()
+            error = f"Barcode {barcode} already belongs to {dup.name}. Add stock to it instead."
+        elif sig and method != "barcode":
+            near = _best_matches(sig, 1)
+            if near and near[0][0] < DUPLICATE_SCORE:
+                error = f"This looks like {near[0][1].name}, which is already registered. Add stock to it instead."
+        if error:
+            flash(error, "error")
         else:
-            db.session.add(Product(tenant_id=tid(), name=name, sku=f.get("sku", "").strip() or None,
-                                   price=price, stock=stock, reorder_level=reorder))
-            db.session.commit()
-            flash("Product added.", "ok")
+            db.session.add(Product(tenant_id=tid(), name=name, price=price, stock=stock, method=method,
+                                   barcode=barcode, scent=scent, sku=f.get("sku", "").strip() or None,
+                                   photo=data or None, photo_mime=_sniff(data) if data else None,
+                                   signature=sig, reorder_level=integer(f.get("reorder_level"), 5)))
+            try:
+                db.session.commit()
+                flash("Product added.", "ok")
+            except Exception:
+                db.session.rollback()
+                flash("That barcode is already registered.", "error")
         return redirect(url_for("ws.products"))
     items = Product.query.filter_by(tenant_id=tid()).order_by(Product.name).all()
     return render_template("ws/products.html", items=items)
+
+
+@ws_bp.post("/products/scan-in")
+@tenant_user
+def scan_in():
+    """Counting stock in by barcode: each scan of a known code adds one unit.
+
+    An unknown code creates the product (name and price required) with one unit.
+    A code never creates a second product.
+    """
+    j = request.get_json(silent=True) or {}
+    code = str(j.get("barcode", "")).strip()[:64]
+    if not code:
+        return {"error": "No barcode received."}, 400
+    p = Product.query.filter_by(tenant_id=tid(), barcode=code).first()
+    if p:
+        p.stock += 1
+        db.session.commit()
+        return {"found": True, "product": _product_json(p)}
+    name, price = str(j.get("name", "")).strip(), money(j.get("price"))
+    if not name or price is None:
+        return {"found": False, "barcode": code}
+    p = Product(tenant_id=tid(), name=name, price=price, stock=1, method="barcode", barcode=code,
+                reorder_level=5)
+    db.session.add(p)
+    try:
+        db.session.commit()
+    except Exception:  # lost a race with another scanner
+        db.session.rollback()
+        p = Product.query.filter_by(tenant_id=tid(), barcode=code).first_or_404()
+        p.stock += 1
+        db.session.commit()
+        return {"found": True, "product": _product_json(p)}
+    return {"found": True, "created": True, "product": _product_json(p)}
+
+
+# ------------------------------------------------------------ quick sell
+
+@ws_bp.get("/quick-sell")
+@tenant_user
+def quick_sell():
+    clients = Client.query.filter_by(tenant_id=tid()).order_by(Client.name).all()
+    return render_template("ws/quick_sell.html", clients=clients)
+
+
+@ws_bp.post("/quick-sell/match")
+@tenant_user
+def quick_match():
+    j = request.get_json(silent=True) or {}
+    code = str(j.get("barcode", "")).strip()
+    if code:
+        p = Product.query.filter_by(tenant_id=tid(), barcode=code).first()
+        if not p:
+            return {"matches": [], "message": f"No product has barcode {code}."}
+        return {"matches": [_product_json(p, 0.0)]}
+    sig = str(j.get("signature", "")).strip().lower()
+    if not SIG_RE.match(sig):
+        return {"error": "Could not read the picture. Try again."}, 400
+    matches = _best_matches(sig)
+    if not matches:
+        return {"matches": [], "message": "No registered product looks like this. Try a clearer photo."}
+    return {"matches": [_product_json(p, sc) for sc, p in matches]}
+
+
+@ws_bp.post("/quick-sell/confirm")
+@tenant_user
+def quick_confirm():
+    j = request.get_json(silent=True) or {}
+    p = Product.query.filter_by(id=integer(j.get("product_id"), -1), tenant_id=tid()).with_for_update().first()
+    qty = integer(j.get("quantity"))
+    if not p:
+        return {"error": "Product not found."}, 404
+    if not qty:
+        return {"error": "Enter how many to sell."}, 400
+    if qty > p.stock:
+        return {"error": f"Only {p.stock} of {p.name} left in stock."}, 409
+    client = None
+    if j.get("client_id"):
+        client = Client.query.filter_by(id=integer(j.get("client_id"), -1), tenant_id=tid()).first()
+    total = p.price * qty
+    paid = money(j.get("paid"), total) if str(j.get("paid", "")).strip() else total
+    paid = min(paid, total)
+    if paid < total and not client:
+        return {"error": "Choose a client for a part-paid or credit sale."}, 400
+    p.stock -= qty
+    db.session.add(Sale(tenant_id=tid(), client=client, product_id=p.id, product_name=p.name,
+                        quantity=qty, unit_price=p.price, paid=paid, created_by=current_user.id))
+    db.session.commit()
+    return {"ok": True, "total": str(total), "stock": p.stock, "name": p.name}
 
 
 @ws_bp.post("/products/<int:pid>/restock")

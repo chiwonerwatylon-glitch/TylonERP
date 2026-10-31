@@ -10,6 +10,7 @@
     {% else %}
     {% set ep = request.endpoint or '' %}
     <a class="nav {{ 'on' if ep=='ws.home' }}" href="{{ url_for('ws.home') }}">Dashboard</a>
+    <a class="nav {{ 'on' if ep=='ws.quick_sell' }}" href="{{ url_for('ws.quick_sell') }}">Quick sell</a>
     <a class="nav {{ 'on' if ep=='ws.products' }}" href="{{ url_for('ws.products') }}">Stock</a>
     <a class="nav {{ 'on' if ep=='ws.clients' }}" href="{{ url_for('ws.clients') }}">Clients</a>
     <a class="nav {{ 'on' if ep=='ws.sales' }}" href="{{ url_for('ws.sales') }}">Sales</a>

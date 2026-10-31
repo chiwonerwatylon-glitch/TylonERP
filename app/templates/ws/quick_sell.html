@@ -1,0 +1,101 @@
+{% extends "shell.html" %}
+{% block content %}
+<div class="head"><h1>Quick sell</h1><a class="btn btn-sm" href="{{ url_for('ws.home') }}">Back</a></div>
+
+<div class="card" style="margin-bottom:20px">
+  <div class="cam"><video id="v" muted playsinline></video><canvas id="c" class="hidden"></canvas><div class="hint" id="hint">Camera is off</div></div>
+  <div class="actions">
+    <button class="btn btn-gold big" id="start" type="button">Open camera</button>
+    <button class="btn big hidden" id="snap" type="button">Match this product</button>
+    <button class="btn big hidden" id="scan" type="button">Scan barcode</button>
+    <label class="btn big" style="margin:0;text-transform:none;letter-spacing:0">Use a picture<input type="file" id="file" accept="image/*" capture="environment" class="hidden"></label>
+  </div>
+  <div class="field" style="margin-top:14px"><label>Or type a barcode</label><div class="actions" style="margin:0"><input type="text" id="man" inputmode="numeric" style="max-width:260px"><button type="button" class="btn" id="manbtn">Find</button></div></div>
+</div>
+
+<div id="msg"></div>
+<div id="cands"></div>
+
+<div id="sell" class="card hidden">
+  <h3 id="sname"></h3>
+  <p class="muted" id="sinfo"></p>
+  <div class="two">
+    <div class="field"><label>How many to sell</label><input type="text" id="qty" inputmode="numeric" value="1"></div>
+    <div class="field"><label>Total</label><div class="count" id="total">0.00</div></div>
+  </div>
+  <div class="two">
+    <div class="field"><label>Amount paid (blank = paid in full)</label><input type="text" id="paid" inputmode="decimal"></div>
+    <div class="field"><label>Client (needed for credit)</label><select id="client"><option value="">Walk-in</option>{% for c in clients %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}</select></div>
+  </div>
+  <button class="btn btn-gold big" id="confirm" type="button">Sell</button>
+</div>
+
+<script src="{{ url_for('static', filename='capture.js') }}"></script>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const urls = {match: "{{ url_for('ws.quick_match') }}", confirm: "{{ url_for('ws.quick_confirm') }}"};
+  let stream = null, stopScan = null, chosen = null;
+  const say = (t, k) => { $('msg').innerHTML = ''; if (t) { const d = document.createElement('div'); d.className = 'toast ' + (k || ''); d.textContent = t; $('msg').appendChild(d); } };
+
+  function cameraOff() { if (stopScan) { stopScan(); stopScan = null; } TT.stopCamera(stream, $('v')); stream = null; $('start').classList.remove('hidden'); $('snap').classList.add('hidden'); $('scan').classList.add('hidden'); $('hint').textContent = 'Camera is off'; }
+
+  $('start').onclick = async () => {
+    try { stream = await TT.startCamera($('v')); $('v').classList.remove('hidden'); $('c').classList.add('hidden'); $('start').classList.add('hidden'); $('snap').classList.remove('hidden'); $('scan').classList.remove('hidden'); $('hint').textContent = 'Point at the product'; say(''); }
+    catch (e) { say(e.message, 'error'); }
+  };
+
+  function showCands(list) {
+    $('cands').innerHTML = ''; $('sell').classList.add('hidden'); chosen = null;
+    list.forEach((p, i) => {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'cand';
+      b.innerHTML = (p.photo ? '<img class="thumb" src="' + p.photo + '" alt="">' : '<span class="thumb"></span>') +
+        '<span style="flex:1"><b></b><br><small></small></span><span class="badge ' + (p.stock > 0 ? 'ok' : 'off') + '"></span>';
+      b.querySelector('b').textContent = p.name;
+      b.querySelector('small').textContent = (p.match != null && p.match < 100 ? p.match + '% match · ' : '') + p.price + ' each';
+      b.querySelector('.badge').textContent = p.stock > 0 ? p.stock + ' in stock' : 'Out of stock';
+      b.onclick = () => choose(p, b);
+      $('cands').appendChild(b);
+      if (list.length === 1 || (i === 0 && p.match >= 85)) choose(p, b);
+    });
+  }
+  function choose(p, el) {
+    document.querySelectorAll('.cand').forEach(x => x.classList.toggle('on', x === el));
+    chosen = p;
+    $('sell').classList.remove('hidden'); $('sname').textContent = p.name;
+    if (p.stock <= 0) { $('sinfo').textContent = 'Out of stock – this cannot be sold.'; $('confirm').disabled = true; }
+    else { $('sinfo').textContent = p.stock + ' available at ' + p.price + ' each'; $('confirm').disabled = false; }
+    $('qty').value = 1; $('paid').value = ''; update();
+  }
+  const update = () => { const q = parseInt($('qty').value || '0', 10) || 0; $('total').textContent = chosen ? (q * parseFloat(chosen.price)).toFixed(2) : '0.00'; };
+  $('qty').oninput = update;
+
+  async function match(body) {
+    say('Matching…');
+    const r = await TT.post(urls.match, body);
+    if (r.error) return say(r.error, 'error');
+    say(r.matches.length ? '' : (r.message || 'No match.'), r.matches.length ? '' : 'error');
+    showCands(r.matches);
+  }
+  const doSnap = canvas => { $('c').width = canvas.width; $('c').height = canvas.height; $('c').getContext('2d').drawImage(canvas, 0, 0); $('c').classList.remove('hidden'); $('v').classList.add('hidden'); return match({signature: TT.signature(canvas)}); };
+  $('snap').onclick = async () => { const canvas = TT.frameToCanvas($('v')); await doSnap(canvas); $('v').classList.remove('hidden'); setTimeout(() => $('c').classList.add('hidden'), 1500); };
+  $('file').onchange = async e => { if (e.target.files[0]) { try { await doSnap(await TT.fileToCanvas(e.target.files[0])); } catch (x) { say(x.message, 'error'); } } };
+  $('manbtn').onclick = () => { const v = $('man').value.trim(); if (v) match({barcode: v}); };
+  $('scan').onclick = async () => {
+    if (stopScan) { stopScan(); stopScan = null; $('scan').textContent = 'Scan barcode'; return; }
+    try { stopScan = await TT.scanBarcodes($('v'), code => { match({barcode: code}); }); $('scan').textContent = 'Stop scanning'; $('hint').textContent = 'Scanning…'; }
+    catch (e) { say(e.message, 'error'); }
+  };
+
+  $('confirm').onclick = async () => {
+    if (!chosen) return;
+    $('confirm').disabled = true;
+    const r = await TT.post(urls.confirm, {product_id: chosen.id, quantity: $('qty').value, paid: $('paid').value, client_id: $('client').value});
+    if (r.error) { say(r.error, 'error'); $('confirm').disabled = false; return; }
+    say('Sold ' + $('qty').value + ' × ' + r.name + ' for ' + r.total + '. ' + r.stock + ' left.', 'ok');
+    $('sell').classList.add('hidden'); $('cands').innerHTML = ''; chosen = null;
+  };
+  window.addEventListener('pagehide', cameraOff);
+})();
+</script>
+{% endblock %}

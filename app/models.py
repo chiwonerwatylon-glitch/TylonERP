@@ -106,6 +106,15 @@ class Product(db.Model):
     stock = db.Column(db.Integer, nullable=False, default=0)
     reorder_level = db.Column(db.Integer, nullable=False, default=5)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    # How the product is recognised: barcode, photo or scent
+    method = db.Column(db.String(10), default="photo")
+    barcode = db.Column(db.String(64))
+    scent = db.Column(db.String(120))
+    photo = db.Column(db.LargeBinary)
+    photo_mime = db.Column(db.String(40))
+    signature = db.Column(db.String(70))  # 16 hex dHash + 54 hex colour grid
+
+    __table_args__ = (db.Index("uq_product_barcode", "tenant_id", "barcode", unique=True),)
 
 
 class Client(db.Model):
