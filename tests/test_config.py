@@ -14,8 +14,10 @@ def test_defaults_are_development():
 
 
 def test_postgres_scheme_is_normalised():
-    assert make(database_url="postgres://u:p@h/db").database_url == "postgresql://u:p@h/db"
-    assert make(database_url="postgresql://u:p@h/db").database_url == "postgresql://u:p@h/db"
+    assert make(database_url="postgres://u:p@h/db").database_url == "postgresql+psycopg2://u:p@h/db"
+    assert make(database_url="postgresql://u:p@h/db").database_url == "postgresql+psycopg2://u:p@h/db"
+    # an explicit driver is left alone
+    assert make(database_url="postgresql+psycopg://u:p@h/db").database_url == "postgresql+psycopg://u:p@h/db"
 
 
 def test_production_refuses_the_dev_secret():
@@ -54,3 +56,10 @@ def test_app_refuses_to_boot_with_dev_key_in_production(tmp_path, monkeypatch):
     monkeypatch.delenv("SECRET_KEY", raising=False)
     with pytest.raises(RuntimeError, match="SECRET_KEY"):
         create_app()
+
+
+def test_auto_migrate_decision():
+    assert make(database_url="sqlite:///x.db").should_auto_migrate is True
+    assert make(database_url="postgresql://u:p@h/db").should_auto_migrate is False
+    assert make(database_url="postgresql://u:p@h/db", auto_migrate=True).should_auto_migrate is True
+    assert make(database_url="sqlite:///x.db", auto_migrate=False).should_auto_migrate is False
