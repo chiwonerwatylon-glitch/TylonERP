@@ -34,7 +34,9 @@ def test_account_locks_after_five_failures(client, app, two_tenants):
     for _ in range(5):
         login(client, "alpha", two_tenants["alpha"]["email"], "nope")
     r = login(client, "alpha", two_tenants["alpha"]["email"])  # correct password, now locked
-    assert b"Too many failed attempts" in r.data
+    # Same message as a wrong password, so a lockout does not reveal that the account exists
+    assert b"Incorrect email or password" in r.data
+    assert client.get("/t/alpha/app/").status_code == 302
     with app.app_context():
         assert User.query.filter_by(email=two_tenants["alpha"]["email"]).one().is_locked()
 

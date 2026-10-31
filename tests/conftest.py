@@ -19,6 +19,7 @@ def app(tmp_path, monkeypatch):
     monkeypatch.setenv("COOKIE_SECURE", "0")
     monkeypatch.setenv("SECRET_KEY", "test-secret")
     monkeypatch.setenv("ADMIN_PASSWORD", "admin-pass-123")
+    monkeypatch.setenv("RATELIMIT_ENABLED", "0")
     app = create_app()
     app.config.update(TESTING=True, WTF_CSRF_ENABLED=False)
     yield app

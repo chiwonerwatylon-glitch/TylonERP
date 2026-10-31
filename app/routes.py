@@ -3,11 +3,13 @@ import secrets
 from datetime import datetime, timedelta
 from functools import wraps
 
-from flask import Blueprint, abort, flash, redirect, render_template, request, session, url_for
+from flask import Blueprint, abort, current_app, flash, redirect, render_template, request, session, url_for
 from flask_login import current_user, login_required, login_user, logout_user
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from . import VERSION, db
 from .models import PLAN_ORDER, PLANS, Tenant, User
+from .security import limiter
 
 auth_bp = Blueprint("auth", __name__)
 admin_bp = Blueprint("admin", __name__)
@@ -17,6 +19,7 @@ EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 SLUG_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{1,58}[a-z0-9])$")
 MAX_ATTEMPTS = 5
 LOCK_MINUTES = 15
+_DUMMY_HASH = generate_password_hash("not-a-real-password")
 
 
 def superadmin_required(view):
@@ -42,39 +45,62 @@ def _home_for(user):
 
 # ---------------------------------------------------------------- auth
 
+GENERIC_LOGIN_ERROR = "Incorrect email or password."
+
+
+def _attempt_login(tenant):
+    """Check the submitted credentials and sign the user in.
+
+    Every failure returns the same message, so the response never reveals whether an email
+    exists, is locked, or belongs to a different tenant. Returns a redirect on success, else None.
+    """
+    email = request.form.get("email", "").strip().lower()
+    password = request.form.get("password", "")
+    user = User.query.filter_by(email=email).first()
+
+    if user is None:
+        # Spend the same time as a real check so timing does not reveal unknown emails
+        check_password_hash(_DUMMY_HASH, password)
+        return None
+    if user.is_locked():
+        return None
+
+    if not user.check_password(password):
+        user.failed_attempts += 1
+        if user.failed_attempts >= MAX_ATTEMPTS:
+            user.locked_until = datetime.utcnow() + timedelta(minutes=LOCK_MINUTES)
+            user.failed_attempts = 0
+        db.session.commit()
+        return None
+
+    if tenant and user.tenant_id != tenant.id:
+        return None
+    if not user.is_active:
+        flash("This account is disabled. Contact your administrator.", "error")
+        return False
+
+    user.failed_attempts = 0
+    user.locked_until = None
+    user.last_login = datetime.utcnow()
+    db.session.commit()
+    login_user(user)
+    session.permanent = bool(request.form.get("remember"))
+    return redirect(_safe_next(request.args.get("next")) or _home_for(user))
+
+
 @auth_bp.route("/login", methods=["GET", "POST"])
 @auth_bp.route("/t/<slug>", methods=["GET", "POST"])
+@limiter.limit(lambda: current_app.config["LOGIN_RATE_LIMIT"], methods=["POST"])
 def login(slug=None):
     tenant = Tenant.query.filter_by(slug=slug).first_or_404() if slug else None
     if current_user.is_authenticated:
         return redirect(_home_for(current_user))
     if request.method == "POST":
-        email = request.form.get("email", "").strip().lower()
-        password = request.form.get("password", "")
-        user = User.query.filter_by(email=email).first()
-        if user and user.is_locked():
-            flash("Too many failed attempts. Try again in a few minutes.", "error")
-        elif user and user.check_password(password) and tenant and user.tenant_id != tenant.id:
-            flash("Incorrect email or password.", "error")
-        elif user and user.check_password(password):
-            if not user.is_active:
-                flash("This account is disabled. Contact your administrator.", "error")
-            else:
-                user.failed_attempts = 0
-                user.locked_until = None
-                user.last_login = datetime.utcnow()
-                db.session.commit()
-                login_user(user)
-                session.permanent = bool(request.form.get("remember"))
-                return redirect(_safe_next(request.args.get("next")) or _home_for(user))
-        else:
-            if user:
-                user.failed_attempts += 1
-                if user.failed_attempts >= MAX_ATTEMPTS:
-                    user.locked_until = datetime.utcnow() + timedelta(minutes=LOCK_MINUTES)
-                    user.failed_attempts = 0
-                db.session.commit()
-            flash("Incorrect email or password.", "error")
+        result = _attempt_login(tenant)
+        if result:
+            return result
+        if result is None:
+            flash(GENERIC_LOGIN_ERROR, "error")
     return render_template("login.html", tenant=tenant)
 
 
