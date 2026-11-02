@@ -21,3 +21,7 @@ ignore = ["E501", "E701", "SIM108", "B904", "B905", "UP031"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.setuptools.packages.find]
+# Only the Flask app is a Python package; android/ is the Android Studio project.
+include = ["app*"]
