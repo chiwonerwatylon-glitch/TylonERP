@@ -49,6 +49,7 @@
       {{ item(['ws.debtors'], url_for('ws.debtors'), 'wallet', 'Debtors') }}
       {% if current_user.role == 'admin' %}
       {{ item(['ws.members'], url_for('ws.members'), 'team', 'Members') }}
+      {{ item(['ws.payments'], url_for('ws.payments'), 'wallet', 'Payments') }}
       {{ item(['ws.branding'], url_for('ws.branding'), 'image', 'Login page') }}
       {% endif %}
     {% endif %}

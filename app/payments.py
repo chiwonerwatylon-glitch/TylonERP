@@ -7,6 +7,7 @@ import re
 import time
 import uuid
 from dataclasses import dataclass
+from types import SimpleNamespace
 from decimal import Decimal
 
 import requests
@@ -46,6 +47,31 @@ class Result:
 
 def new_correlator(tenant_id: int, sale_id: int) -> str:
     return f"T{tenant_id}S{sale_id}-{uuid.uuid4().hex[:10]}"
+
+
+def client_for_tenant(settings, tenant, session=None):
+    """Build a client from platform endpoint settings plus the tenant's own merchant account.
+
+    Returns a disabled client when the tenant has not set EcoCash up; there is deliberately no fallback to
+    platform credentials, so one tenant's customers can never pay into another account.
+    """
+    from .secrets import decrypt
+
+    tp = tenant.payment if tenant else None
+    on = bool(tp and tp.ecocash_enabled and tp.complete)
+    merged = SimpleNamespace(
+        ecocash_base_url=settings.ecocash_base_url, ecocash_charge_path=settings.ecocash_charge_path,
+        ecocash_currency=settings.ecocash_currency, ecocash_notify_url=settings.ecocash_notify_url,
+        ecocash_timeout=settings.ecocash_timeout, ecocash_super_merchant_name=settings.ecocash_super_merchant_name,
+        ecocash_username=tp.username if on else None,
+        ecocash_password=decrypt(tp.password_enc, settings.secret_key) if on else None,
+        ecocash_merchant_code=tp.merchant_code if on else None,
+        ecocash_merchant_pin=decrypt(tp.merchant_pin_enc, settings.secret_key) if on else "",
+        ecocash_merchant_number=normalise_msisdn(tp.merchant_number) if on else None,
+        ecocash_merchant_name=(tp.merchant_name or tenant.name) if on else "",
+        ecocash_terminal_id=(tp.terminal_id or "WEB00001") if on else "",
+        ecocash_location=(tp.location or "Harare") if on else "")
+    return EcoCashClient(merged, session)
 
 
 class EcoCashClient:
