@@ -9,10 +9,11 @@ from flask import Blueprint, Response, abort, current_app, flash, g, redirect, r
 from flask_login import current_user, login_required
 
 from . import db
-from .models import Client, Product, Sale, Tenant, TenantBranding, User
-from .payments import (ECOCASH_RE, ONEMONEY_RE, EcoCashClient, EcoCashError, EcoCashUnknown, new_correlator,
-                       normalise_msisdn)
+from .models import Client, Product, Sale, Tenant, TenantBranding, TenantPayment, User
+from .payments import (ECOCASH_RE, ONEMONEY_RE, EcoCashError, EcoCashUnknown, client_for_tenant,
+                       new_correlator, normalise_msisdn)
 from .routes import EMAIL_RE
+from .secrets import encrypt
 
 ws_bp = Blueprint("ws", __name__, url_prefix="/t/<slug>/app")
 public_bp = Blueprint("tenant_public", __name__)
@@ -78,7 +79,7 @@ METHODS = ("cash", "ecocash", "onemoney")
 
 
 def ecocash():
-    return EcoCashClient(current_app.extensions["settings"])
+    return client_for_tenant(current_app.extensions["settings"], current_user.tenant)
 
 
 def complete_sale(p, qty, client, paid_raw, method, phone_raw, ref):
@@ -98,7 +99,7 @@ def complete_sale(p, qty, client, paid_raw, method, phone_raw, ref):
     if method == "ecocash":
         gateway = ecocash()
         if not gateway.enabled:
-            return None, "EcoCash is not set up yet. Ask the administrator to add the EcoCash credentials.", None
+            return None, "EcoCash is not set up for this business yet. An admin can add the merchant details under Payments.", None
         if not ECOCASH_RE.match(phone):
             return None, "Enter the customer's EcoCash number, for example 0771234567.", None
         if paid <= 0:
@@ -703,3 +704,41 @@ def branding():
         flash("Login page updated.", "ok")
         return redirect(url_for("ws.branding"))
     return render_template("ws/branding.html", tenant=t, b=b)
+
+
+# ------------------------------------------------------------ payment settings
+
+@ws_bp.route("/payments", methods=["GET", "POST"])
+@tenant_admin
+def payments():
+    t = current_user.tenant
+    tp = t.payment
+    if request.method == "POST":
+        f = request.form
+        tp = tp or TenantPayment(tenant_id=t.id)
+        db.session.add(tp)
+        key = current_app.extensions["settings"].secret_key
+        tp.username = f.get("username", "").strip()[:120] or None
+        tp.merchant_code = f.get("merchant_code", "").strip()[:40] or None
+        tp.merchant_number = normalise_msisdn(f.get("merchant_number")) or None
+        tp.merchant_name = f.get("merchant_name", "").strip()[:120] or None
+        tp.terminal_id = f.get("terminal_id", "").strip()[:40] or None
+        tp.location = f.get("location", "").strip()[:60] or None
+        # Secrets are never shown again; blank means keep the saved value.
+        if f.get("password"):
+            tp.password_enc = encrypt(f["password"], key)
+        if f.get("merchant_pin"):
+            tp.merchant_pin_enc = encrypt(f["merchant_pin"], key)
+        if tp.merchant_number and not ECOCASH_RE.match(tp.merchant_number):
+            db.session.rollback()
+            flash("Merchant number must be an EcoCash number, for example 0771234567.", "error")
+            return redirect(url_for("ws.payments"))
+        tp.ecocash_enabled = bool(f.get("ecocash_enabled"))
+        if tp.ecocash_enabled and not tp.complete:
+            tp.ecocash_enabled = False
+            flash("Saved, but EcoCash stays off until username, password, merchant code and merchant number are filled in.", "error")
+        else:
+            flash("Payment settings saved.", "ok")
+        db.session.commit()
+        return redirect(url_for("ws.payments"))
+    return render_template("ws/payments.html", tp=tp)

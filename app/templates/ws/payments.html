@@ -1,0 +1,21 @@
+{% extends "shell.html" %}
+{% block content %}
+<div class="page-head"><h1>Payments</h1></div>
+<form method="post" autocomplete="off" class="card card-body mw-form">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<h2 class="h5">EcoCash merchant account</h2>
+<p class="text-body-secondary">Customers who pay with EcoCash pay into <b>your</b> merchant account. Get these details from the <a href="https://developers.ecocash.co.zw" target="_blank" rel="noopener">EcoCash developer portal</a>. Saved passwords and PINs are stored encrypted and are not shown again.</p>
+<div class="form-check form-switch mb-3"><input class="form-check-input" type="checkbox" name="ecocash_enabled" id="en" {{ 'checked' if tp and tp.ecocash_enabled }}><label class="form-check-label fw-normal" for="en">Accept EcoCash payments</label></div>
+<div class="row g-3 mb-3">
+<div class="col-md-6"><label class="form-label">API username</label><input class="form-control" name="username" value="{{ tp.username if tp and tp.username else '' }}"></div>
+<div class="col-md-6"><label class="form-label">API password {% if tp and tp.password_enc %}<span class="badge text-bg-success">saved</span>{% endif %}</label><input class="form-control" type="password" name="password" autocomplete="new-password" placeholder="{{ 'Leave blank to keep' if tp and tp.password_enc }}"></div>
+<div class="col-md-6"><label class="form-label">Merchant code</label><input class="form-control" name="merchant_code" value="{{ tp.merchant_code if tp and tp.merchant_code else '' }}"></div>
+<div class="col-md-6"><label class="form-label">Merchant PIN {% if tp and tp.merchant_pin_enc %}<span class="badge text-bg-success">saved</span>{% endif %}</label><input class="form-control" type="password" name="merchant_pin" autocomplete="new-password" placeholder="{{ 'Leave blank to keep' if tp and tp.merchant_pin_enc }}"></div>
+<div class="col-md-6"><label class="form-label">Merchant number</label><input class="form-control" type="tel" name="merchant_number" placeholder="0771234567" value="{{ tp.merchant_number if tp and tp.merchant_number else '' }}"></div>
+<div class="col-md-6"><label class="form-label">Shop name shown to customers</label><input class="form-control" name="merchant_name" value="{{ tp.merchant_name if tp and tp.merchant_name else '' }}" placeholder="{{ current_user.tenant.name }}"></div>
+<div class="col-md-6"><label class="form-label">Terminal ID</label><input class="form-control" name="terminal_id" value="{{ tp.terminal_id if tp and tp.terminal_id else '' }}" placeholder="WEB00001"></div>
+<div class="col-md-6"><label class="form-label">Location</label><input class="form-control" name="location" value="{{ tp.location if tp and tp.location else '' }}" placeholder="Harare"></div>
+</div>
+<button class="btn btn-primary align-self-start">Save</button>
+</form>
+{% endblock %}

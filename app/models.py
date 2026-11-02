@@ -41,6 +41,27 @@ class Tenant(db.Model):
         return PLAN_ORDER[i + 1] if i + 1 < len(PLAN_ORDER) else None
 
 
+class TenantPayment(db.Model):
+    """A tenant's own EcoCash merchant account, so customer payments go to that tenant."""
+    __tablename__ = "tenant_payments"
+    id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(db.Integer, db.ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, unique=True)
+    ecocash_enabled = db.Column(db.Boolean, nullable=False, default=False)
+    username = db.Column(db.String(120))
+    password_enc = db.Column(db.Text)  # encrypted, see app/secrets.py
+    merchant_code = db.Column(db.String(40))
+    merchant_pin_enc = db.Column(db.Text)
+    merchant_number = db.Column(db.String(20))
+    merchant_name = db.Column(db.String(120))
+    terminal_id = db.Column(db.String(40))
+    location = db.Column(db.String(60))
+    tenant = db.relationship("Tenant", backref=db.backref("payment", uselist=False, cascade="all, delete-orphan"))
+
+    @property
+    def complete(self):
+        return bool(self.username and self.password_enc and self.merchant_code and self.merchant_number)
+
+
 class User(UserMixin, db.Model):
     __tablename__ = "users"
     id = db.Column(db.Integer, primary_key=True)

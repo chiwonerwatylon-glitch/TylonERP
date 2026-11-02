@@ -149,3 +149,38 @@ def test_onemoney_records_reference(alpha, app, two_tenants):
     with app.app_context():
         s = Sale.query.one()
         assert (s.payment_method, s.payment_ref, s.paid) == ("onemoney", "NM123", s.total)
+
+
+def test_tenant_credentials_encrypted_and_isolated(client, app, two_tenants):
+    from app.models import Tenant, TenantPayment
+    from app.payments import client_for_tenant
+
+    login(client, "alpha", two_tenants["alpha"]["email"])
+    form = {"ecocash_enabled": "on", "username": "alpha-user", "password": "s3cret-pw", "merchant_code": "001",
+            "merchant_pin": "4321", "merchant_number": "+263 78 873 2685"}
+    client.post("/t/alpha/app/payments", data=form)
+    with app.app_context():
+        tp = TenantPayment.query.one()
+        assert tp.ecocash_enabled and tp.merchant_number == "788732685"
+        assert "s3cret-pw" not in tp.password_enc and "4321" not in tp.merchant_pin_enc
+        s = app.extensions["settings"]
+        c = client_for_tenant(s, db.session.get(Tenant, two_tenants["alpha"]["tenant"]))
+        assert c.enabled and (c.s.ecocash_password, c.s.ecocash_merchant_pin) == ("s3cret-pw", "4321")
+        # beta has nothing configured and must not inherit alpha's account
+        assert not client_for_tenant(s, db.session.get(Tenant, two_tenants["beta"]["tenant"])).enabled
+    # blank secrets on re-save keep the stored ones
+    client.post("/t/alpha/app/payments", data={**form, "password": "", "merchant_pin": "", "username": "new"})
+    with app.app_context():
+        c = client_for_tenant(app.extensions["settings"], db.session.get(Tenant, two_tenants["alpha"]["tenant"]))
+        assert c.s.ecocash_username == "new" and c.s.ecocash_password == "s3cret-pw"
+
+
+def test_cannot_enable_incomplete_and_staff_blocked(client, app, two_tenants):
+    from app.models import TenantPayment
+
+    login(client, "alpha", two_tenants["alpha"]["email"])
+    client.post("/t/alpha/app/payments", data={"ecocash_enabled": "on", "username": "x"})
+    with app.app_context():
+        assert not TenantPayment.query.one().ecocash_enabled
+    client.get("/logout")
+    assert client.get("/t/beta/app/payments").status_code in (302, 404)
