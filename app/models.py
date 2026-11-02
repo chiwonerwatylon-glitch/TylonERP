@@ -144,6 +144,16 @@ class Sale(db.Model):
     paid = db.Column(db.Numeric(12, 2), nullable=False, default=0)
     created_by = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"))
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+    # How it was paid: cash, ecocash or onemoney. NULL on older sales means cash.
+    payment_method = db.Column(db.String(12))
+    payment_status = db.Column(db.String(12))  # pending, paid, refunded (mobile money only)
+    payment_phone = db.Column(db.String(20))
+    payment_ref = db.Column(db.String(60))  # EcoCash reference, or the OneMoney transaction code
+    payment_correlator = db.Column(db.String(60))
+
+    @property
+    def method_label(self):
+        return {"ecocash": "EcoCash", "onemoney": "OneMoney"}.get(self.payment_method, "Cash")
 
     @property
     def total(self):
@@ -156,6 +166,8 @@ class Sale(db.Model):
     @property
     def kind(self):
         """Cash = paid in full, Credit = nothing paid, Part-paid in between."""
+        if self.payment_status in ("pending", "refunded"):
+            return self.payment_status.capitalize()
         if self.paid >= self.total:
             return "Cash"
         return "Credit" if self.paid <= 0 else "Part-paid"

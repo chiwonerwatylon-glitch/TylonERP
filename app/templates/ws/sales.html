@@ -8,7 +8,12 @@
 <div class="col-md-4"><label class="form-label">Quantity</label><input class="form-control" type="text" name="quantity" inputmode="numeric" value="1" required></div></div>
 <div class="row g-3 mb-3"><div class="col-md-6"><label class="form-label">Client (optional for cash sales)</label><select class="form-select" name="client_id"><option value="">Walk-in</option>{% for c in clients %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}</select></div>
 <div class="col-md-6"><label class="form-label">Amount paid (blank = paid in full)</label><input class="form-control" type="text" name="paid" inputmode="decimal"></div></div>
+<div class="row g-3 mb-3"><div class="col-md-4"><label class="form-label">Payment method</label><select class="form-select" name="method" id="pm"><option value="cash">Cash</option><option value="ecocash">EcoCash</option><option value="onemoney">OneMoney (NetOne)</option></select></div>
+<div class="col-md-4 hidden" id="pphone"><label class="form-label">Customer mobile number</label><input class="form-control" type="tel" name="phone" inputmode="tel" placeholder="0771234567"></div>
+<div class="col-md-4 hidden" id="pref"><label class="form-label">OneMoney transaction code</label><input class="form-control" type="text" name="payment_ref" maxlength="60"></div></div>
+<div class="form-text mb-3 hidden" id="phint">EcoCash: the customer gets a PIN prompt on their phone. Keep this page open until it confirms.</div>
 <button class="btn btn-primary align-self-start">Record sale and print receipt</button></form>
+<script>(()=>{const m=document.getElementById("pm"),sh=(i,on)=>document.getElementById(i).classList.toggle("hidden",!on);const f=()=>{sh("pphone",m.value!=="cash");sh("pref",m.value==="onemoney");sh("phint",m.value==="ecocash")};m.onchange=f;f()})();</script>
 
 <div class="row g-3 mb-3">
   <div class="col-6 col-lg-3"><div class="card stat h-100"><div class="k">Sales</div><div class="v">{{ summary.count }}</div></div></div>
@@ -28,10 +33,12 @@
 <td class="text-nowrap">#{{ '%06d'|format(numbers[s.id]) }}</td>
 <td class="text-nowrap">{{ s.created_at.strftime('%d %b %Y %H:%M') }}</td><td class="text-nowrap">{{ s.product_name }} &times; {{ s.quantity }}</td>
 <td>{{ s.client.name if s.client else 'Walk-in' }}</td>
-<td><span class="badge text-bg-{{ 'success' if s.kind=='Cash' else ('danger' if s.kind=='Credit' else 'warning') }}">{{ s.kind }}</span></td>
+<td><span class="badge text-bg-{{ 'success' if s.kind=='Cash' else ('danger' if s.kind=='Credit' else 'warning') }}">{{ s.kind }}</span>{% if s.payment_method in ('ecocash','onemoney') %} <span class="badge text-bg-info">{{ s.method_label }}</span>{% endif %}</td>
 <td class="text-end">{{ '%.2f'|format(s.total) }}</td><td class="text-end">{{ '%.2f'|format(s.paid) }}</td>
 <td class="text-end">{% if s.balance > 0 %}<span class="badge text-bg-danger">{{ '%.2f'|format(s.balance) }}</span>{% else %}&ndash;{% endif %}</td>
-<td class="text-end"><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('ws.receipt', sid=s.id) }}" target="_blank" rel="noopener">Receipt</a></td></tr>
+<td class="text-end text-nowrap"><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('ws.receipt', sid=s.id) }}" target="_blank" rel="noopener">Receipt</a>
+{% if s.payment_method=='ecocash' and s.payment_status=='pending' %}<form method="post" class="d-inline" action="{{ url_for('ws.check_payment', sid=s.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-primary">Check payment</button></form>{% endif %}
+{% if s.payment_method=='ecocash' and s.payment_status=='paid' and current_user.role=='admin' %}<form method="post" class="d-inline" action="{{ url_for('ws.refund', sid=s.id) }}" onsubmit="return confirm('Refund {{ '%.2f'|format(s.paid) }} to {{ s.payment_phone }}?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-danger">Refund</button></form>{% endif %}</td></tr>
 {% else %}<tr><td colspan="9" class="text-body-secondary">No {{ kind if kind!='all' else '' }} sales yet.</td></tr>{% endfor %}</tbody></table></div></div>
 
 {% if pages > 1 %}<div class="d-flex justify-content-center align-items-center gap-3 mt-3">

@@ -5,11 +5,13 @@ from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from functools import wraps
 
-from flask import Blueprint, Response, abort, flash, g, redirect, render_template, request, url_for
+from flask import Blueprint, Response, abort, current_app, flash, g, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from . import db
 from .models import Client, Product, Sale, Tenant, TenantBranding, User
+from .payments import (ECOCASH_RE, ONEMONEY_RE, EcoCashClient, EcoCashError, EcoCashUnknown, new_correlator,
+                       normalise_msisdn)
 from .routes import EMAIL_RE
 
 ws_bp = Blueprint("ws", __name__, url_prefix="/t/<slug>/app")
@@ -70,6 +72,82 @@ def integer(v, default=None):
     except (TypeError, ValueError):
         return default
     return n if n >= 0 else default
+
+
+METHODS = ("cash", "ecocash", "onemoney")
+
+
+def ecocash():
+    return EcoCashClient(current_app.extensions["settings"])
+
+
+def complete_sale(p, qty, client, paid_raw, method, phone_raw, ref):
+    """Create the sale, take mobile-money payment if asked, and return (sale, error, warning).
+
+    Cash keeps the old behaviour. EcoCash charges the customer's wallet (they approve with their PIN) and
+    only keeps the sale if the charge succeeds. OneMoney (NetOne) has no integration yet: the cashier
+    confirms the payment on the customer's phone and records the NetOne transaction code.
+    """
+    method = method if method in METHODS else "cash"
+    total = p.price * qty
+    paid = money(paid_raw, total) if str(paid_raw or "").strip() else total
+    paid = min(paid, total)
+    if paid < total and not client:
+        return None, "Choose a client for a part-paid or credit sale.", None
+    phone = normalise_msisdn(phone_raw)
+    if method == "ecocash":
+        gateway = ecocash()
+        if not gateway.enabled:
+            return None, "EcoCash is not set up yet. Ask the administrator to add the EcoCash credentials.", None
+        if not ECOCASH_RE.match(phone):
+            return None, "Enter the customer's EcoCash number, for example 0771234567.", None
+        if paid <= 0:
+            return None, "Enter an amount above zero to charge.", None
+    elif method == "onemoney":
+        ref = (ref or "").strip()[:60]
+        if not ONEMONEY_RE.match(phone):
+            return None, "Enter the customer's OneMoney number, for example 0711234567.", None
+        if not ref:
+            return None, "Enter the OneMoney transaction code from the confirmation message.", None
+        if paid <= 0:
+            return None, "Enter an amount above zero.", None
+
+    p.stock -= qty
+    sale = Sale(tenant_id=tid(), client=client, product_id=p.id, product_name=p.name, quantity=qty,
+                unit_price=p.price, paid=paid if method in ("cash", "onemoney") else 0,
+                created_by=current_user.id, payment_method=method)
+    if method == "onemoney":
+        sale.payment_phone, sale.payment_ref, sale.payment_status = phone, ref, "paid"
+    db.session.add(sale)
+    if method != "ecocash":
+        db.session.commit()
+        return sale, None, None
+
+    # Save as pending first so a crash or timeout can never lose track of a charge.
+    sale.payment_phone, sale.payment_status = phone, "pending"
+    db.session.flush()
+    sale.payment_correlator = new_correlator(tid(), sale.id)
+    db.session.commit()
+    try:
+        res = gateway.charge(phone, paid, sale.payment_correlator, f"SALE-{tid()}-{sale.id}", p.name)
+    except EcoCashError as e:
+        _undo_sale(sale, p, qty)
+        return None, f"EcoCash payment failed: {e}", None
+    except EcoCashUnknown:
+        return sale, None, ("EcoCash did not answer, so the payment is unconfirmed. "
+                            "Use Check payment on the Sales page before handing over the goods.")
+    if not res.ok:
+        _undo_sale(sale, p, qty)
+        return None, "EcoCash did not take the payment.", None
+    sale.paid, sale.payment_status, sale.payment_ref = paid, "paid", res.ecocash_reference
+    db.session.commit()
+    return sale, None, None
+
+
+def _undo_sale(sale, p, qty):
+    p.stock += qty
+    db.session.delete(sale)
+    db.session.commit()
 
 
 # ------------------------------------------------------------ public tenant login page
@@ -299,17 +377,12 @@ def quick_confirm():
     client = None
     if j.get("client_id"):
         client = Client.query.filter_by(id=integer(j.get("client_id"), -1), tenant_id=tid()).first()
-    total = p.price * qty
-    paid = money(j.get("paid"), total) if str(j.get("paid", "")).strip() else total
-    paid = min(paid, total)
-    if paid < total and not client:
-        return {"error": "Choose a client for a part-paid or credit sale."}, 400
-    p.stock -= qty
-    sale = Sale(tenant_id=tid(), client=client, product_id=p.id, product_name=p.name,
-                quantity=qty, unit_price=p.price, paid=paid, created_by=current_user.id)
-    db.session.add(sale)
-    db.session.commit()
-    return {"ok": True, "total": str(total), "stock": p.stock, "name": p.name,
+    sale, error, warning = complete_sale(p, qty, client, j.get("paid"), j.get("method"), j.get("phone"),
+                                         j.get("payment_ref"))
+    if error:
+        db.session.rollback()
+        return {"error": error}, 400
+    return {"ok": True, "total": str(sale.total), "stock": p.stock, "name": p.name, "warning": warning,
             "receipt": url_for("ws.receipt", sid=sale.id, print=1, back="quick")}
 
 
@@ -379,17 +452,15 @@ def sales():
         if error:
             flash(error, "error")
         else:
-            total = p.price * qty
-            paid = money(f.get("paid"), total) if f.get("paid", "").strip() else total
-            paid = min(paid, total)
-            if paid < total and not client:
-                flash("Choose a client for a part-paid or credit sale.", "error")
+            sale, error, warning = complete_sale(p, qty, client, f.get("paid"), f.get("method"), f.get("phone"),
+                                                 f.get("payment_ref"))
+            if error:
+                db.session.rollback()
+                flash(error, "error")
                 return redirect(url_for("ws.sales"))
-            p.stock -= qty
-            sale = Sale(tenant_id=tid(), client=client, product_id=p.id, product_name=p.name,
-                        quantity=qty, unit_price=p.price, paid=paid, created_by=current_user.id)
-            db.session.add(sale)
-            db.session.commit()
+            if warning:
+                flash(warning, "error")
+                return redirect(url_for("ws.sales"))
             return redirect(url_for("ws.receipt", sid=sale.id, print=1, back="sales"))
         return redirect(url_for("ws.sales"))
 
@@ -438,13 +509,69 @@ def receipt(sid):
                            back=request.args.get("back", "sales"))
 
 
+@ws_bp.post("/sales/<int:sid>/check-payment")
+@tenant_user
+def check_payment(sid):
+    """Ask EcoCash what happened to a charge we could not confirm."""
+    s = Sale.query.filter_by(id=sid, tenant_id=tid(), payment_method="ecocash", payment_status="pending").first_or_404()
+    try:
+        res = ecocash().lookup(s.payment_phone, s.payment_correlator)
+    except EcoCashUnknown:
+        flash("EcoCash did not answer. Try again in a moment.", "error")
+    except EcoCashError as e:
+        if e.http_status not in (400, 404):
+            flash(f"Could not check the payment: {e}", "error")
+            return redirect(url_for("ws.sales"))
+        # Failed charges are not stored by EcoCash, so "not found" means the customer was not charged.
+        p = Product.query.filter_by(id=s.product_id, tenant_id=tid()).with_for_update().first()
+        if p:
+            p.stock += s.quantity
+        db.session.delete(s)
+        db.session.commit()
+        flash("EcoCash has no payment for that sale. The sale was cancelled and the stock returned.", "ok")
+    else:
+        if res.ok:
+            s.paid, s.payment_status, s.payment_ref = s.total if s.paid < s.total else s.paid, "paid", res.ecocash_reference
+            db.session.commit()
+            flash("EcoCash confirmed the payment.", "ok")
+        else:
+            flash(f"EcoCash reports the payment as {res.status or 'not complete'}.", "error")
+    return redirect(url_for("ws.sales"))
+
+
+@ws_bp.post("/sales/<int:sid>/refund")
+@tenant_admin
+def refund(sid):
+    """Refund an EcoCash payment to the customer's wallet and put the stock back."""
+    s = Sale.query.filter_by(id=sid, tenant_id=tid(), payment_method="ecocash", payment_status="paid").first_or_404()
+    amount = s.paid
+    try:
+        res = ecocash().refund(s.payment_phone, amount, s.payment_ref, tid(), s.id,
+                               reverse=request.form.get("kind") == "reverse")
+    except EcoCashError as e:
+        flash(f"Refund failed: {e}", "error")
+    except EcoCashUnknown:
+        flash("EcoCash did not answer. Do not retry blindly: check the customer's wallet, then try again.", "error")
+    else:
+        if res.ok:
+            s.paid, s.payment_status = 0, "refunded"
+            p = Product.query.filter_by(id=s.product_id, tenant_id=tid()).with_for_update().first()
+            if p:
+                p.stock += s.quantity
+            db.session.commit()
+            flash(f"Refunded {amount} to {s.payment_phone}.", "ok")
+        else:
+            flash("EcoCash did not complete the refund.", "error")
+    return redirect(url_for("ws.sales"))
+
+
 # ------------------------------------------------------------ debtors
 
 @ws_bp.get("/debtors")
 @tenant_user
 def debtors():
     open_sales = [s for s in Sale.query.filter_by(tenant_id=tid()).order_by(Sale.created_at).all()
-                  if s.balance > 0 and s.client]
+                  if s.balance > 0 and s.client and s.payment_status != "pending"]
     return render_template("ws/debtors.html", items=open_sales,
                            total=sum((s.balance for s in open_sales), Decimal(0)))
 

@@ -27,6 +27,12 @@
     <div class="col-sm-6"><label class="form-label">Amount paid (blank = paid in full)</label><input class="form-control" type="text" id="paid" inputmode="decimal"></div>
     <div class="col-sm-6"><label class="form-label">Client (needed for credit)</label><select class="form-select" id="client"><option value="">Walk-in</option>{% for c in clients %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}</select></div>
   </div>
+  <div class="row g-3 mb-3">
+    <div class="col-sm-4"><label class="form-label">Payment method</label><select class="form-select" id="method"><option value="cash">Cash</option><option value="ecocash">EcoCash</option><option value="onemoney">OneMoney (NetOne)</option></select></div>
+    <div class="col-sm-4 hidden" id="wphone"><label class="form-label">Customer mobile number</label><input class="form-control" type="tel" id="phone" inputmode="tel" placeholder="0771234567"></div>
+    <div class="col-sm-4 hidden" id="wref"><label class="form-label">OneMoney transaction code</label><input class="form-control" type="text" id="pref" maxlength="60"></div>
+  </div>
+  <p class="text-body-secondary hidden" id="mhint">The customer will get a PIN prompt on their phone. Keep this page open until it confirms.</p>
   <button class="btn btn-primary btn-lg" id="confirm" type="button">Sell</button>
 </div>
 
@@ -65,10 +71,12 @@
     $('sell').classList.remove('hidden'); $('sname').textContent = p.name;
     if (p.stock <= 0) { $('sinfo').textContent = 'Out of stock – this cannot be sold.'; $('confirm').disabled = true; }
     else { $('sinfo').textContent = p.stock + ' available at ' + p.price + ' each'; $('confirm').disabled = false; }
-    $('qty').value = 1; $('paid').value = ''; update();
+    $('qty').value = 1; $('paid').value = ''; $('method').value = 'cash'; $('phone').value = ''; $('pref').value = ''; methodUi(); update();
   }
   const update = () => { const q = parseInt($('qty').value || '0', 10) || 0; $('total').textContent = chosen ? (q * parseFloat(chosen.price)).toFixed(2) : '0.00'; };
   $('qty').oninput = update;
+  const methodUi = () => { const m = $('method').value; $('wphone').classList.toggle('hidden', m === 'cash'); $('wref').classList.toggle('hidden', m !== 'onemoney'); $('mhint').classList.toggle('hidden', m !== 'ecocash'); };
+  $('method').onchange = methodUi;
 
   async function match(body) {
     say('Matching…');
@@ -90,9 +98,9 @@
   $('confirm').onclick = async () => {
     if (!chosen) return;
     $('confirm').disabled = true;
-    const r = await TT.post(urls.confirm, {product_id: chosen.id, quantity: $('qty').value, paid: $('paid').value, client_id: $('client').value});
+    const r = await TT.post(urls.confirm, {product_id: chosen.id, quantity: $('qty').value, paid: $('paid').value, client_id: $('client').value, method: $('method').value, phone: $('phone').value, payment_ref: $('pref').value});
     if (r.error) { say(r.error, 'error'); $('confirm').disabled = false; return; }
-    say('Sold ' + $('qty').value + ' × ' + r.name + ' for ' + r.total + '. ' + r.stock + ' left. Printing receipt…', 'ok');
+    say(r.warning || ('Sold ' + $('qty').value + ' × ' + r.name + ' for ' + r.total + '. ' + r.stock + ' left. Printing receipt…'), r.warning ? 'error' : 'ok');
     printReceipt(r.receipt);
     $('sell').classList.add('hidden'); $('cands').innerHTML = ''; chosen = null;
   };
