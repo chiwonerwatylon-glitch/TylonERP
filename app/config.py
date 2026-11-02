@@ -32,18 +32,11 @@ class Settings(BaseSettings):
     ratelimit_storage_uri: str = "memory://"
     session_days: int = Field(30, ge=1)
 
-    # EcoCash Online Payments (https://developers.ecocash.co.zw). Leave the credentials unset to disable it.
+    # EcoCash Online Payments (https://developers.ecocash.co.zw). Each tenant enters its own merchant
+    # credentials under Payments; only the platform-wide endpoint settings live here.
     ecocash_base_url: str = "https://developers.ecocash.co.zw/sandbox/payment/v1"
     ecocash_charge_path: str = "/transactions/amount"
-    ecocash_username: str | None = None
-    ecocash_password: str | None = None
-    ecocash_merchant_code: str | None = None
-    ecocash_merchant_pin: str = ""
-    ecocash_merchant_number: str | None = None
-    ecocash_merchant_name: str = "TylonERP"
     ecocash_super_merchant_name: str = "ECOCASH"
-    ecocash_terminal_id: str = "WEB00001"
-    ecocash_location: str = "Harare"
     ecocash_currency: str = "USD"
     ecocash_notify_url: str | None = None
     ecocash_timeout: int = Field(60, ge=5)
