@@ -7,8 +7,8 @@ import re
 import time
 import uuid
 from dataclasses import dataclass
-from types import SimpleNamespace
 from decimal import Decimal
+from types import SimpleNamespace
 
 import requests
 

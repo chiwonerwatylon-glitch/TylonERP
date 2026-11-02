@@ -51,6 +51,21 @@ failed sign-in shows the same message. Responses carry CSP, frame, nosniff, refe
 and HSTS over HTTPS; pages are sent `Cache-Control: no-store`. The rate limiter counts in memory per gunicorn
 worker; set `RATELIMIT_STORAGE_URI` to a Redis URL to share counts across workers.
 
+## Adding stock
+
+The **Stock** page offers five ways in. Every addition is logged under *Recent stock added* with who did it and how.
+
+- **Barcode**: scan with the camera or type a code. Set *Units per scan* to count a whole carton with one scan. An
+  unknown code asks for a name and price and registers the product.
+- **Photo** and **Scent**: register a product from a picture (and a scent description); Quick sell can then match it
+  by photo.
+- **Manual**: type the name, price and quantity, with an optional SKU and barcode. No camera needed.
+- **Import list**: upload a CSV (or paste rows) with `name, price, quantity, barcode, sku, reorder_level`. Rows that
+  match an existing product by barcode, SKU or name add to its stock; new rows create products. Bad rows are skipped
+  and reported by line number. A template CSV is linked on the page.
+
+Each product row also has an **Add** box to top up its stock by hand.
+
 ## Mobile money payments
 
 On **Quick sell** and **Sales**, choose a payment method:

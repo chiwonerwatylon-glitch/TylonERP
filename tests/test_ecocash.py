@@ -38,13 +38,12 @@ DECLINED = FakeResp(422, {"responseCode": "INSUFFICIENT", "message": "Insufficie
 
 
 def settings(**kw):
-    base = dict(ecocash_base_url="https://eco.test/v1", ecocash_charge_path="/transactions/amount",
-                ecocash_username="u", ecocash_password="p", ecocash_merchant_code="001",
-                ecocash_merchant_pin="0000", ecocash_merchant_number="788732685", ecocash_merchant_name="Shop",
-                ecocash_super_merchant_name="ECOCASH", ecocash_terminal_id="T1", ecocash_location="Harare",
-                ecocash_currency="USD", ecocash_notify_url=None, ecocash_timeout=5)
-    base.update(kw)
-    return SimpleNamespace(**base)
+    base = {"ecocash_base_url": "https://eco.test/v1", "ecocash_charge_path": "/transactions/amount",
+            "ecocash_username": "u", "ecocash_password": "p", "ecocash_merchant_code": "001",
+            "ecocash_merchant_pin": "0000", "ecocash_merchant_number": "788732685", "ecocash_merchant_name": "Shop",
+            "ecocash_super_merchant_name": "ECOCASH", "ecocash_terminal_id": "T1", "ecocash_location": "Harare",
+            "ecocash_currency": "USD", "ecocash_notify_url": None, "ecocash_timeout": 5}
+    return SimpleNamespace(**{**base, **kw})
 
 
 @pytest.fixture

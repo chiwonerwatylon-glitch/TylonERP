@@ -1,10 +1,17 @@
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 
 from flask_login import UserMixin
 from sqlalchemy.orm import joinedload
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from . import db, login_manager
+
+
+def utcnow():
+    """Current UTC time without tzinfo, matching how the DateTime columns store it."""
+    return datetime.now(UTC).replace(tzinfo=None)
+
 
 PLANS = {
     "starter": {"label": "Starter", "max_users": 3, "price": 0},
@@ -23,8 +30,8 @@ class Tenant(db.Model):
     phone = db.Column(db.String(40))
     plan = db.Column(db.String(20), nullable=False, default="starter")
     is_active = db.Column(db.Boolean, nullable=False, default=True)
-    trial_ends_at = db.Column(db.DateTime, default=lambda: datetime.utcnow() + timedelta(days=30))
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    trial_ends_at = db.Column(db.DateTime, default=lambda: utcnow() + timedelta(days=30))
+    created_at = db.Column(db.DateTime, nullable=False, default=utcnow)
     users = db.relationship("User", backref="tenant", cascade="all, delete-orphan")
 
     @property
@@ -75,7 +82,7 @@ class User(UserMixin, db.Model):
     failed_attempts = db.Column(db.Integer, nullable=False, default=0)
     locked_until = db.Column(db.DateTime)
     last_login = db.Column(db.DateTime)
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, nullable=False, default=utcnow)
 
     @property
     def is_active(self):  # Flask-Login hook
@@ -92,7 +99,7 @@ class User(UserMixin, db.Model):
         return check_password_hash(self.password_hash, password)
 
     def is_locked(self):
-        return bool(self.locked_until and self.locked_until > datetime.utcnow())
+        return bool(self.locked_until and self.locked_until > utcnow())
 
 
 @login_manager.user_loader
@@ -113,7 +120,7 @@ class TenantBranding(db.Model):
     accent = db.Column(db.String(7))
     background = db.Column(db.String(7))
     panel = db.Column(db.String(7))
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow)
     tenant = db.relationship("Tenant", backref=db.backref("branding", uselist=False, cascade="all, delete-orphan"))
 
 
@@ -126,7 +133,7 @@ class Product(db.Model):
     price = db.Column(db.Numeric(12, 2), nullable=False, default=0)
     stock = db.Column(db.Integer, nullable=False, default=0)
     reorder_level = db.Column(db.Integer, nullable=False, default=5)
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, nullable=False, default=utcnow)
     # How the product is recognised: barcode, photo or scent
     method = db.Column(db.String(10), default="photo")
     barcode = db.Column(db.String(64))
@@ -138,6 +145,28 @@ class Product(db.Model):
     __table_args__ = (db.Index("uq_product_barcode", "tenant_id", "barcode", unique=True),)
 
 
+class StockMovement(db.Model):
+    """A record of stock coming in (restock, scan, import, new product), so additions can be audited."""
+    __tablename__ = "stock_movements"
+    id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(db.Integer, db.ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True)
+    product_id = db.Column(db.Integer, db.ForeignKey("products.id", ondelete="CASCADE"), nullable=False, index=True)
+    quantity = db.Column(db.Integer, nullable=False)
+    source = db.Column(db.String(20), nullable=False)  # new, restock, scan, import
+    note = db.Column(db.String(120))
+    created_by = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"))
+    created_at = db.Column(db.DateTime, nullable=False, default=utcnow, index=True)
+    product = db.relationship("Product", backref=db.backref("movements", cascade="all, delete-orphan",
+                                                            passive_deletes=True))
+    user = db.relationship("User")
+
+    SOURCE_LABELS = {"new": "New product", "restock": "Added by hand", "scan": "Barcode scan", "import": "Import"}
+
+    @property
+    def source_label(self):
+        return self.SOURCE_LABELS.get(self.source, self.source.capitalize())
+
+
 class Client(db.Model):
     __tablename__ = "clients"
     id = db.Column(db.Integer, primary_key=True)
@@ -145,7 +174,7 @@ class Client(db.Model):
     name = db.Column(db.String(150), nullable=False)
     email = db.Column(db.String(255))
     phone = db.Column(db.String(40))
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, nullable=False, default=utcnow)
     sales = db.relationship("Sale", backref="client")
 
     @property
@@ -164,7 +193,7 @@ class Sale(db.Model):
     unit_price = db.Column(db.Numeric(12, 2), nullable=False)
     paid = db.Column(db.Numeric(12, 2), nullable=False, default=0)
     created_by = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"))
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=utcnow, index=True)
     # How it was paid: cash, ecocash or onemoney. NULL on older sales means cash.
     payment_method = db.Column(db.String(12))
     payment_status = db.Column(db.String(12))  # pending, paid, refunded (mobile money only)
@@ -181,8 +210,13 @@ class Sale(db.Model):
         return self.quantity * self.unit_price
 
     @property
+    def settled(self):
+        """Pending and refunded mobile-money sales are not debts: nothing is owed on them."""
+        return self.payment_status in ("pending", "refunded")
+
+    @property
     def balance(self):
-        return self.total - self.paid
+        return Decimal(0) if self.settled else self.total - self.paid
 
     @property
     def kind(self):

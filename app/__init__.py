@@ -1,6 +1,5 @@
 import logging
 import re
-from datetime import datetime
 
 from flask import Flask, g, redirect, request, url_for
 from flask.sessions import SecureCookieSessionInterface
@@ -12,7 +11,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from .config import load_settings
 from .security import init_security, limiter
 
-VERSION = "1.6.1"
+VERSION = "1.7.0"
 
 db = SQLAlchemy()
 login_manager = LoginManager()
@@ -112,7 +111,7 @@ def create_app(config=None):
 
     @app.context_processor
     def inject_globals():
-        return {"app_version": VERSION, "plans": models.PLANS, "now": datetime.utcnow(),
+        return {"app_version": VERSION, "plans": models.PLANS, "now": models.utcnow(),
                 "theme_style": _theme_style(), "auth_colors": _auth_colors()}
 
     @app.get("/healthz")

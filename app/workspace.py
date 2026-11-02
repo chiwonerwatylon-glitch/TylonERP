@@ -1,17 +1,26 @@
 """Tenant workspace: dashboard, stock, clients, sales, debtors, members, branding."""
+import csv
+import io
 import re
 import secrets
-from datetime import datetime, timedelta
-from decimal import Decimal, InvalidOperation
+from datetime import timedelta
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from functools import wraps
 
 from flask import Blueprint, Response, abort, current_app, flash, g, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from . import db
-from .models import Client, Product, Sale, Tenant, TenantBranding, TenantPayment, User
-from .payments import (ECOCASH_RE, ONEMONEY_RE, EcoCashError, EcoCashUnknown, client_for_tenant,
-                       new_correlator, normalise_msisdn)
+from .models import Client, Product, Sale, StockMovement, Tenant, TenantBranding, TenantPayment, User, utcnow
+from .payments import (
+    ECOCASH_RE,
+    ONEMONEY_RE,
+    EcoCashError,
+    EcoCashUnknown,
+    client_for_tenant,
+    new_correlator,
+    normalise_msisdn,
+)
 from .routes import EMAIL_RE
 from .secrets import encrypt
 
@@ -59,20 +68,35 @@ def tid():
     return current_user.tenant_id
 
 
+MAX_MONEY = Decimal("9999999999.99")  # Numeric(12, 2)
+MAX_QTY = 1_000_000  # largest quantity accepted in one go
+
+
 def money(v, default=None):
+    """Parse a non-negative amount with at most two decimals. 'NaN', 'Infinity' and huge numbers are rejected."""
     try:
         d = Decimal(str(v).strip())
-    except (InvalidOperation, AttributeError):
+    except (InvalidOperation, AttributeError, ValueError):
         return default
-    return d if d >= 0 else default
+    if not d.is_finite() or d < 0:
+        return default
+    d = d.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    return d if d <= MAX_MONEY else default
 
 
-def integer(v, default=None):
+def integer(v, default=None, maximum=2_000_000_000):
     try:
-        n = int(v)
+        n = int(str(v).strip())
     except (TypeError, ValueError):
         return default
-    return n if n >= 0 else default
+    return n if 0 <= n <= maximum else default
+
+
+def add_stock(p, qty, source, note=None):
+    """Increase a product's stock and keep a record of where it came from."""
+    p.stock += qty
+    db.session.add(StockMovement(tenant_id=p.tenant_id, product=p, quantity=qty, source=source,
+                                 note=(note or "")[:120] or None, created_by=current_user.id))
 
 
 METHODS = ("cash", "ecocash", "onemoney")
@@ -181,9 +205,9 @@ def login_image(slug):
 @tenant_user
 def home():
     t = current_user.tenant
-    today = datetime.utcnow() - timedelta(days=30)
+    since = utcnow() - timedelta(days=30)
     sales = Sale.query.filter_by(tenant_id=tid()).all()
-    recent = [s for s in sales if s.created_at >= today]
+    recent = [s for s in sales if s.created_at >= since and s.payment_status != "refunded"]
     low = Product.query.filter(Product.tenant_id == tid(), Product.stock <= Product.reorder_level).order_by(Product.stock).limit(6).all()
     stats = {
         "revenue": sum((s.total for s in recent), Decimal(0)),
@@ -251,19 +275,21 @@ def products():
     if request.method == "POST":
         f = request.form
         method = f.get("method", "photo")
-        name = f.get("name", "").strip()
+        name = f.get("name", "").strip()[:150]
         price = money(f.get("price"))
-        stock = integer(f.get("stock"), 0)
-        barcode = f.get("barcode", "").strip() or None
+        stock = integer(f.get("stock"), None, MAX_QTY) if str(f.get("stock") or "").strip() else 0
+        barcode = f.get("barcode", "").strip()[:64] or None
         scent = f.get("scent", "").strip() or None
         sig = f.get("signature", "").strip().lower() or None
         file = request.files.get("photo")
         data = file.read(MAX_PHOTO + 1) if file and file.filename else b""
         error = None
-        if method not in ("barcode", "photo", "scent"):
+        if method not in ("barcode", "photo", "scent", "manual"):
             error = "Choose how this product is recognised."
         elif not name or price is None:
             error = "Product name and a valid price are required."
+        elif stock is None:
+            error = f"Enter how many you have, from 0 to {MAX_QTY:,}."
         elif method == "barcode" and not barcode:
             error = "Scan or type the barcode."
         elif method == "scent" and not scent:
@@ -276,20 +302,25 @@ def products():
             error = "Photo signature is invalid. Take the photo again."
         elif method in ("photo", "scent") and not sig:
             error = "Photo could not be analysed. Take the photo again."
-        elif barcode and Product.query.filter_by(tenant_id=tid(), barcode=barcode).first():
-            dup = Product.query.filter_by(tenant_id=tid(), barcode=barcode).first()
+        elif barcode and (dup := Product.query.filter_by(tenant_id=tid(), barcode=barcode).first()):
             error = f"Barcode {barcode} already belongs to {dup.name}. Add stock to it instead."
-        elif sig and method != "barcode":
+        elif method == "manual" and Product.query.filter(Product.tenant_id == tid(),
+                                                         db.func.lower(Product.name) == name.lower()).first():
+            error = f"{name} is already registered. Add stock to it instead."
+        elif sig and method in ("photo", "scent"):
             near = _best_matches(sig, 1)
             if near and near[0][0] < DUPLICATE_SCORE:
                 error = f"This looks like {near[0][1].name}, which is already registered. Add stock to it instead."
         if error:
             flash(error, "error")
         else:
-            db.session.add(Product(tenant_id=tid(), name=name, price=price, stock=stock, method=method,
-                                   barcode=barcode, scent=scent, sku=f.get("sku", "").strip() or None,
-                                   photo=data or None, photo_mime=_sniff(data) if data else None,
-                                   signature=sig, reorder_level=integer(f.get("reorder_level"), 5)))
+            p = Product(tenant_id=tid(), name=name, price=price, stock=0, method=method,
+                        barcode=barcode, scent=scent, sku=f.get("sku", "").strip()[:60] or None,
+                        photo=data or None, photo_mime=_sniff(data) if data else None,
+                        signature=sig, reorder_level=integer(f.get("reorder_level"), 5, MAX_QTY))
+            db.session.add(p)
+            if stock:
+                add_stock(p, stock, "new")
             try:
                 db.session.commit()
                 flash("Product added.", "ok")
@@ -298,41 +329,205 @@ def products():
                 flash("That barcode is already registered.", "error")
         return redirect(url_for("ws.products"))
     items = Product.query.filter_by(tenant_id=tid()).order_by(Product.name).all()
-    return render_template("ws/products.html", items=items)
+    history = (StockMovement.query.filter_by(tenant_id=tid())
+               .order_by(StockMovement.created_at.desc(), StockMovement.id.desc()).limit(15).all())
+    return render_template("ws/products.html", items=items, history=history, max_qty=MAX_QTY)
 
 
 @ws_bp.post("/products/scan-in")
 @tenant_user
 def scan_in():
-    """Counting stock in by barcode: each scan of a known code adds one unit.
+    """Counting stock in by barcode: each scan of a known code adds `quantity` units (default 1).
 
-    An unknown code creates the product (name and price required) with one unit.
+    A quantity above one suits a carton or a case: scan once and count the whole box.
+    An unknown code creates the product (name and price required) with that many units.
     A code never creates a second product.
     """
     j = request.get_json(silent=True) or {}
     code = str(j.get("barcode", "")).strip()[:64]
     if not code:
         return {"error": "No barcode received."}, 400
-    p = Product.query.filter_by(tenant_id=tid(), barcode=code).first()
+    raw_qty = j.get("quantity")
+    qty = integer(raw_qty, None, MAX_QTY) if str(raw_qty if raw_qty is not None else "").strip() else 1
+    if not qty:
+        return {"error": f"Units per scan must be a whole number from 1 to {MAX_QTY:,}."}, 400
+    p = Product.query.filter_by(tenant_id=tid(), barcode=code).with_for_update().first()
     if p:
-        p.stock += 1
+        add_stock(p, qty, "scan")
         db.session.commit()
-        return {"found": True, "product": _product_json(p)}
-    name, price = str(j.get("name", "")).strip(), money(j.get("price"))
+        return {"found": True, "added": qty, "product": _product_json(p)}
+    name, price = str(j.get("name", "")).strip()[:150], money(j.get("price"))
     if not name or price is None:
+        if j.get("name") is not None or j.get("price") is not None:
+            return {"found": False, "barcode": code, "error": "Enter the product name and a valid price."}
         return {"found": False, "barcode": code}
-    p = Product(tenant_id=tid(), name=name, price=price, stock=1, method="barcode", barcode=code,
+    p = Product(tenant_id=tid(), name=name, price=price, stock=0, method="barcode", barcode=code,
                 reorder_level=5)
     db.session.add(p)
+    add_stock(p, qty, "new", "Registered by scan")
     try:
         db.session.commit()
     except Exception:  # lost a race with another scanner
         db.session.rollback()
         p = Product.query.filter_by(tenant_id=tid(), barcode=code).first_or_404()
-        p.stock += 1
+        add_stock(p, qty, "scan")
         db.session.commit()
-        return {"found": True, "product": _product_json(p)}
-    return {"found": True, "created": True, "product": _product_json(p)}
+        return {"found": True, "added": qty, "product": _product_json(p)}
+    return {"found": True, "created": True, "added": qty, "product": _product_json(p)}
+
+
+# ------------------------------------------------------------ bulk import
+
+IMPORT_MAX_ROWS = 2000
+IMPORT_MAX_BYTES = 1024 * 1024
+IMPORT_COLUMNS = ("name", "price", "quantity", "barcode", "sku", "reorder_level")
+HEADER_ALIASES = {
+    "name": "name", "product": "name", "product name": "name", "item": "name", "description": "name",
+    "price": "price", "selling price": "price", "unit price": "price",
+    "quantity": "quantity", "qty": "quantity", "stock": "quantity", "units": "quantity", "count": "quantity",
+    "barcode": "barcode", "ean": "barcode", "upc": "barcode", "code": "barcode",
+    "sku": "sku", "reorder level": "reorder_level", "reorder_level": "reorder_level", "reorder": "reorder_level",
+}
+IMPORT_TEMPLATE = ("name,price,quantity,barcode,sku,reorder_level\n"
+                   "Bath soap 250g,1.50,24,6001234567890,SOAP-250,6\n"
+                   "Cooking oil 2L,4.20,12,,OIL-2L,4\n")
+
+
+def _read_import_rows(text):
+    """Parse CSV text (comma, semicolon or tab separated, header row optional) into dicts keyed by IMPORT_COLUMNS.
+
+    Returns (rows, error). Each row carries its line number for error messages.
+    """
+    lines = [ln for ln in text.splitlines() if ln.strip()]
+    if not lines:
+        return [], "The list is empty."
+    try:
+        dialect = csv.Sniffer().sniff(lines[0], delimiters=",;\t")
+    except csv.Error:
+        dialect = csv.excel
+    reader = csv.reader(io.StringIO("\n".join(lines)), dialect)
+    first = next(reader)
+    mapped = [HEADER_ALIASES.get(c.strip().lower().replace("_", " "), HEADER_ALIASES.get(c.strip().lower()))
+              for c in first]
+    if "name" in mapped or "barcode" in mapped or "sku" in mapped:
+        columns, data, start = mapped, list(reader), 2
+    else:  # no header row: name, price, quantity, barcode, sku, reorder_level
+        columns, data, start = list(IMPORT_COLUMNS), [first, *reader], 1
+    if len(data) > IMPORT_MAX_ROWS:
+        return [], f"Import at most {IMPORT_MAX_ROWS:,} rows at a time."
+    rows = []
+    for n, values in enumerate(data, start):
+        row = {"line": n}
+        for col, val in zip(columns, values):
+            if col and not row.get(col):
+                row[col] = val.strip()
+        rows.append(row)
+    return rows, None
+
+
+def import_stock(rows, update_prices=False):
+    """Apply parsed rows: restock products that exist, create the ones that do not.
+
+    A row matches an existing product by barcode, then SKU, then exact name (ignoring case).
+    Returns a summary dict and a list of per-line problems; good rows are applied even if others fail.
+    """
+    products = Product.query.filter_by(tenant_id=tid()).all()
+    by_barcode = {p.barcode: p for p in products if p.barcode}
+    by_sku = {p.sku.lower(): p for p in products if p.sku}
+    by_name = {p.name.lower(): p for p in products}
+    summary = {"created": 0, "restocked": 0, "units": 0}
+    problems = []
+    for r in rows:
+        line, name = r["line"], (r.get("name") or "")[:150]
+        barcode, sku = (r.get("barcode") or "")[:64] or None, (r.get("sku") or "")[:60] or None
+        qty = integer(r.get("quantity"), None, MAX_QTY) if r.get("quantity") else 0
+        price = money(r.get("price")) if r.get("price") else None
+        if qty is None:
+            problems.append(f"Line {line}: quantity must be a whole number from 0 to {MAX_QTY:,}.")
+            continue
+        if r.get("price") and price is None:
+            problems.append(f"Line {line}: price {r['price']!r} is not a valid amount.")
+            continue
+        p = (by_barcode.get(barcode) if barcode else None) or (by_sku.get(sku.lower()) if sku else None) \
+            or (by_name.get(name.lower()) if name else None)
+        if p:
+            if barcode and p.barcode and p.barcode != barcode:
+                problems.append(f"Line {line}: {p.name} already has barcode {p.barcode}, not {barcode}.")
+                continue
+            if barcode and not p.barcode and barcode not in by_barcode:
+                p.barcode = barcode
+                by_barcode[barcode] = p
+            if update_prices and price is not None:
+                p.price = price
+            if qty:
+                add_stock(p, qty, "import")
+                summary["restocked"] += 1
+                summary["units"] += qty
+            continue
+        if not name or price is None:
+            problems.append(f"Line {line}: new products need a name and a price.")
+            continue
+        p = Product(tenant_id=tid(), name=name, price=price, stock=0, barcode=barcode, sku=sku,
+                    method="barcode" if barcode else "manual",
+                    reorder_level=integer(r.get("reorder_level"), 5, MAX_QTY))
+        db.session.add(p)
+        if qty:
+            add_stock(p, qty, "new", "Imported")
+        summary["created"] += 1
+        summary["units"] += qty
+        by_name[name.lower()] = p
+        if barcode:
+            by_barcode[barcode] = p
+        if sku:
+            by_sku[sku.lower()] = p
+    return summary, problems
+
+
+@ws_bp.post("/products/import")
+@tenant_user
+def products_import():
+    """Add stock in bulk from an uploaded CSV file or a pasted list (a delivery note, a stock count)."""
+    file = request.files.get("file")
+    if file and file.filename:
+        raw = file.read(IMPORT_MAX_BYTES + 1)
+        if len(raw) > IMPORT_MAX_BYTES:
+            flash("The file must be 1 MB or smaller.", "error")
+            return redirect(url_for("ws.products", tab="import"))
+        try:
+            text = raw.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            text = raw.decode("latin-1")
+    else:
+        text = request.form.get("rows", "")[:IMPORT_MAX_BYTES]
+    rows, error = _read_import_rows(text)
+    if error:
+        flash(error, "error")
+        return redirect(url_for("ws.products", tab="import"))
+    summary, problems = import_stock(rows, update_prices=bool(request.form.get("update_prices")))
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        flash("Nothing was imported: two rows use the same barcode. Check the file and try again.", "error")
+        return redirect(url_for("ws.products", tab="import"))
+    done = summary["created"] + summary["restocked"]
+    if done:
+        flash(f"Imported {done} row{'s' if done != 1 else ''}: {summary['created']} new, "
+              f"{summary['restocked']} restocked, {summary['units']:,} units added.", "ok")
+    for msg in problems[:5]:
+        flash(msg, "error")
+    if len(problems) > 5:
+        flash(f"…and {len(problems) - 5} more rows were skipped.", "error")
+    if not done and not problems:
+        flash("No rows had stock to add.", "error")
+    return redirect(url_for("ws.products", tab="import"))
+
+
+@ws_bp.get("/products/import-template.csv")
+@tenant_user
+def import_template():
+    return Response(IMPORT_TEMPLATE, mimetype="text/csv",
+                    headers={"Content-Disposition": "attachment; filename=stock-import-template.csv"})
 
 
 # ------------------------------------------------------------ quick sell
@@ -390,12 +585,12 @@ def quick_confirm():
 @ws_bp.post("/products/<int:pid>/restock")
 @tenant_user
 def restock(pid):
-    p = Product.query.filter_by(id=pid, tenant_id=tid()).first_or_404()
-    qty = integer(request.form.get("qty"))
+    p = Product.query.filter_by(id=pid, tenant_id=tid()).with_for_update().first_or_404()
+    qty = integer(request.form.get("qty"), None, MAX_QTY)
     if not qty:
-        flash("Enter a quantity greater than zero.", "error")
+        flash(f"Enter a quantity from 1 to {MAX_QTY:,}.", "error")
     else:
-        p.stock += qty
+        add_stock(p, qty, "restock", request.form.get("note", "").strip())
         db.session.commit()
         flash(f"Added {qty} to {p.name}.", "ok")
     return redirect(url_for("ws.products"))
@@ -438,7 +633,7 @@ def clients():
 def sales():
     if request.method == "POST":
         f = request.form
-        p = Product.query.filter_by(id=integer(f.get("product_id"), -1), tenant_id=tid()).first()
+        p = Product.query.filter_by(id=integer(f.get("product_id"), -1), tenant_id=tid()).with_for_update().first()
         qty = integer(f.get("quantity"))
         client = None
         if f.get("client_id"):
@@ -467,10 +662,13 @@ def sales():
 
     kind = request.args.get("type", "all")
     query = Sale.query.filter_by(tenant_id=tid())
+    # Pending and refunded mobile-money sales are not debts, so they never count as credit.
+    owing = db.and_(Sale.paid < Sale.quantity * Sale.unit_price,
+                    db.or_(Sale.payment_status.is_(None), Sale.payment_status.notin_(("pending", "refunded"))))
     if kind == "cash":
-        query = query.filter(Sale.paid >= Sale.quantity * Sale.unit_price)
+        query = query.filter(db.not_(owing))
     elif kind == "credit":
-        query = query.filter(Sale.paid < Sale.quantity * Sale.unit_price)
+        query = query.filter(owing)
     else:
         kind = "all"
     page = max(1, integer(request.args.get("page"), 1))
@@ -486,9 +684,8 @@ def sales():
         "owed": sum((x.balance for x in all_sales), Decimal(0)),
     }
     base = Sale.query.filter_by(tenant_id=tid())
-    counts = {"all": base.count(),
-              "cash": base.filter(Sale.paid >= Sale.quantity * Sale.unit_price).count()}
-    counts["credit"] = counts["all"] - counts["cash"]
+    counts = {"all": base.count(), "credit": base.filter(owing).count()}
+    counts["cash"] = counts["all"] - counts["credit"]
     ids = [i for (i,) in db.session.query(Sale.id).filter_by(tenant_id=tid()).order_by(Sale.id)]
     numbers = {sid: n for n, sid in enumerate(ids, 1)}
     return render_template(
@@ -572,7 +769,7 @@ def refund(sid):
 @tenant_user
 def debtors():
     open_sales = [s for s in Sale.query.filter_by(tenant_id=tid()).order_by(Sale.created_at).all()
-                  if s.balance > 0 and s.client and s.payment_status != "pending"]
+                  if s.balance > 0 and s.client]
     return render_template("ws/debtors.html", items=open_sales,
                            total=sum((s.balance for s in open_sales), Decimal(0)))
 
@@ -582,7 +779,9 @@ def debtors():
 def payment(sid):
     s = Sale.query.filter_by(id=sid, tenant_id=tid()).first_or_404()
     amt = money(request.form.get("amount"))
-    if not amt or amt > s.balance:
+    if s.settled or s.balance <= 0:
+        flash("Nothing is owed on that sale.", "error")
+    elif not amt or amt > s.balance:
         flash(f"Enter an amount up to {s.balance}.", "error")
     else:
         s.paid += amt

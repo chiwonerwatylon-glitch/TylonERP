@@ -1,6 +1,6 @@
 import re
 import secrets
-from datetime import datetime, timedelta
+from datetime import timedelta
 from functools import wraps
 
 from flask import Blueprint, abort, current_app, flash, redirect, render_template, request, session, url_for
@@ -8,7 +8,7 @@ from flask_login import current_user, login_required, login_user, logout_user
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from . import VERSION, db
-from .models import PLAN_ORDER, PLANS, Tenant, User
+from .models import PLAN_ORDER, PLANS, Tenant, User, utcnow
 from .security import limiter
 
 auth_bp = Blueprint("auth", __name__)
@@ -68,20 +68,24 @@ def _attempt_login(tenant):
     if not user.check_password(password):
         user.failed_attempts += 1
         if user.failed_attempts >= MAX_ATTEMPTS:
-            user.locked_until = datetime.utcnow() + timedelta(minutes=LOCK_MINUTES)
+            user.locked_until = utcnow() + timedelta(minutes=LOCK_MINUTES)
             user.failed_attempts = 0
         db.session.commit()
         return None
 
     if tenant and user.tenant_id != tenant.id:
         return None
+    if tenant is None and not user.is_superadmin:
+        # Each business has its own sign-in cookie, so a tenant user signed in here would be bounced straight
+        # back to a login page. Send them to their business's own sign-in page instead.
+        return redirect(url_for("auth.login", slug=user.tenant.slug))
     if not user.is_active:
         flash("This account is disabled. Contact your administrator.", "error")
         return False
 
     user.failed_attempts = 0
     user.locked_until = None
-    user.last_login = datetime.utcnow()
+    user.last_login = utcnow()
     db.session.commit()
     login_user(user)
     session.permanent = bool(request.form.get("remember"))
