@@ -7,7 +7,7 @@
     root.setAttribute('data-bs-theme', p === 'auto' ? (mq.matches ? 'dark' : 'light') : p);
     root.setAttribute('data-theme-pref', p);
     var m = document.querySelector('meta[name=theme-color]');
-    if (m) m.content = root.getAttribute('data-bs-theme') === 'dark' ? '#1b1f23' : '#ffffff';
+    if (m) m.content = root.getAttribute('data-bs-theme') === 'dark' ? '#0b100e' : '#eef1ef';
   }
   window.TTTheme = {set: function (v) { try { localStorage.setItem(KEY, v); } catch (e) {} apply(); }};
   apply();

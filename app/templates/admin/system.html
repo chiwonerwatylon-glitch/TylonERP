@@ -1,6 +1,6 @@
 {% extends "shell.html" %}
 {% block content %}
-<div class="page-head"><h1>System</h1><span class="badge text-bg-primary">v{{ version }}</span></div>
+<div class="page-head"><div><h1>System</h1><p class="sub">Version, database and plan usage for this installation.</p></div></div>
 <div class="row g-3 mb-3">
   <div class="col-6 col-lg-3"><div class="card stat h-100"><div class="k">Version</div><div class="v">{{ version }}</div></div></div>
   <div class="col-6 col-lg-3"><div class="card stat h-100"><div class="k">Database</div><div class="v">{{ db_name }}</div></div></div>

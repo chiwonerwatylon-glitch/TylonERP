@@ -1,6 +1,7 @@
 {% extends "shell.html" %}
+{% block title %}Payments · {{ current_user.tenant.name }}{% endblock %}
 {% block content %}
-<div class="page-head"><h1>Payments</h1></div>
+<div class="page-head"><div><h1>Payments</h1><p class="sub">Take mobile money at the counter. Cash and OneMoney work without setup; EcoCash needs your merchant account.</p></div></div>
 <form method="post" autocomplete="off" class="card card-body mw-form">
 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 <h2 class="h5">EcoCash merchant account</h2>

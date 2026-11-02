@@ -1,10 +1,16 @@
 {% extends "shell.html" %}
+{% block title %}Clients · {{ current_user.tenant.name }}{% endblock %}
 {% block content %}
-<div class="page-head"><h1>Clients</h1></div>
-<form method="post" class="card card-body mb-3"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-<div class="row g-3 mb-3"><div class="col-md-6"><label class="form-label">Name</label><input class="form-control" type="text" name="name" required></div><div class="col-md-6"><label class="form-label">Phone</label><input class="form-control" type="text" name="phone"></div></div>
-<div class="mb-3"><label class="form-label">Email</label><input class="form-control" type="email" name="email"></div><button class="btn btn-primary align-self-start">Add client</button></form>
-<div class="card"><div class="table-responsive"><table class="table align-middle mb-0"><thead><tr><th>Client</th><th>Contact</th><th>Owes</th></tr></thead><tbody>
-{% for c in items %}<tr><td class="fw-semibold">{{ c.name }}</td><td class="text-body-secondary">{{ c.phone or '' }} {{ c.email or '' }}</td><td>{% if c.balance > 0 %}<span class="badge text-bg-danger">{{ '%.2f'|format(c.balance) }}</span>{% else %}<span class="badge text-bg-success">Clear</span>{% endif %}</td></tr>
-{% else %}<tr><td colspan="3" class="text-body-secondary">No clients yet.</td></tr>{% endfor %}</tbody></table></div></div>
+<div class="page-head"><div><h1>Clients</h1><p class="sub">Named customers. A client is needed for credit and part-paid sales.</p></div></div>
+<div class="row g-4">
+<div class="col-lg-4"><form method="post" class="card card-body"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<h2 class="h5 mb-3">Add a client</h2>
+<div class="mb-3"><label class="form-label" for="cn">Name</label><input class="form-control" id="cn" type="text" name="name" required></div>
+<div class="mb-3"><label class="form-label" for="cp">Phone <span class="text-body-secondary fw-normal">(optional)</span></label><input class="form-control" id="cp" type="tel" name="phone" inputmode="tel"></div>
+<div class="mb-4"><label class="form-label" for="ce">Email <span class="text-body-secondary fw-normal">(optional)</span></label><input class="form-control" id="ce" type="email" name="email"></div>
+<div><button class="btn btn-primary">Add client</button></div></form></div>
+<div class="col-lg-8"><div class="card"><div class="card-head"><h2>All clients <span class="text-body-secondary fw-normal">{{ items|length }}</span></h2></div><div class="table-responsive"><table class="table align-middle"><thead><tr><th>Client</th><th>Contact</th><th class="text-end">Owes</th></tr></thead><tbody>
+{% for c in items %}<tr><td class="fw-semibold">{{ c.name }}</td><td class="text-body-secondary">{{ c.phone or '' }} {{ c.email or '' }}</td><td class="text-end">{% if c.balance > 0 %}<span class="badge text-bg-danger">{{ '{:,.2f}'.format(c.balance) }}</span>{% else %}<span class="badge text-bg-success">Clear</span>{% endif %}</td></tr>
+{% else %}<tr><td colspan="3" class="text-body-secondary">No clients yet. Add your first one with the form.</td></tr>{% endfor %}</tbody></table></div></div></div>
+</div>
 {% endblock %}

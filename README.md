@@ -51,6 +51,17 @@ failed sign-in shows the same message. Responses carry CSP, frame, nosniff, refe
 and HSTS over HTTPS; pages are sent `Cache-Control: no-store`. The rate limiter counts in memory per gunicorn
 worker; set `RATELIMIT_STORAGE_URI` to a Redis URL to share counts across workers.
 
+## Design
+
+The interface is Bootstrap 5.3.8 (vendored under `app/static/vendor`) with a design layer in `app/static/style.css`:
+
+- **Palette:** bottle green `#0f5c4a` on a cool sage canvas `#eef1ef`, maize `#e8b230` for low stock and today's bar,
+  and a deep ink sidebar. Dark mode mirrors it. A tenant's own accent (Login page settings) replaces the green.
+- **Type:** Bricolage Grotesque for headings and money figures, Instrument Sans for everything else. Both are
+  self-hosted in `app/static/fonts` (SIL Open Font License) because the content security policy only allows local fonts.
+- **Layout:** sidebar grouped into Sell, Records and Settings; bottom tab bar on phones; a dashboard "till" with
+  30-day takings and a 14-day bar chart; status badges as soft tints; designed 403/404/429/500 pages.
+
 ## Adding stock
 
 The **Stock** page offers five ways in. Every addition is logged under *Recent stock added* with who did it and how.

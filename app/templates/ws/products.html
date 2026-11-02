@@ -1,90 +1,140 @@
 {% extends "shell.html" %}
+{% from "_ui.html" import ico %}
+{% block title %}Stock · {{ current_user.tenant.name }}{% endblock %}
 {% block content %}
-<div class="page-head"><h1>Stock</h1><a class="btn btn-primary" href="{{ url_for('ws.quick_sell') }}">Quick sell</a></div>
+<div class="page-head">
+  <div><h1>Stock</h1><p class="sub">Register products and count stock in. Pick the way that suits what is in front of you.</p></div>
+  <div class="actions"><a class="btn btn-primary d-inline-flex align-items-center gap-2" href="{{ url_for('ws.quick_sell') }}">{{ ico('bolt') }} Quick sell</a></div>
+</div>
 
-<div class="nav nav-pills nav-fill gap-1 mb-3" id="tabs">
-  <button type="button" data-m="barcode" class="nav-link active">Barcode</button>
-  <button type="button" data-m="photo" class="nav-link">Photo</button>
-  <button type="button" data-m="scent" class="nav-link">Scent</button>
-  <button type="button" data-m="manual" class="nav-link">Manual</button>
-  <button type="button" data-m="import" class="nav-link">Import list</button>
+<div class="nav nav-pills mb-3" id="tabs" role="tablist" aria-label="Ways to add stock">
+  <button type="button" data-m="barcode" class="nav-link active d-inline-flex align-items-center gap-2">{{ ico('scan') }} Barcode</button>
+  <button type="button" data-m="photo" class="nav-link d-inline-flex align-items-center gap-2">{{ ico('image') }} Photo</button>
+  <button type="button" data-m="scent" class="nav-link d-inline-flex align-items-center gap-2">{{ ico('box') }} Scent</button>
+  <button type="button" data-m="manual" class="nav-link d-inline-flex align-items-center gap-2">{{ ico('plus') }} Manual</button>
+  <button type="button" data-m="import" class="nav-link d-inline-flex align-items-center gap-2">{{ ico('upload') }} Import list</button>
 </div>
 
 <!-- BARCODE: scan to count stock in -->
-<div id="p-barcode" class="card card-body mb-3">
-  <h2 class="h5">Count stock by scanning</h2>
-  <p class="text-body-secondary">Point the camera at each item. A known barcode adds the units below (1 per item, or the size of a carton). A product is never created twice.</p>
-  <div class="mb-3"><label class="form-label" for="bqty">Units per scan</label><input class="form-control w-qty" type="text" id="bqty" inputmode="numeric" value="1"></div>
-  <div class="cam mb-3"><video id="bv" muted playsinline></video><div class="reticle"></div><div class="hint" id="bhint">Camera is off</div></div>
-  <div class="d-flex gap-2 flex-wrap btn-stack-sm"><button type="button" class="btn btn-primary" id="bstart">Start camera</button><button type="button" class="btn btn-outline-secondary hidden" id="bstop">Stop</button></div>
-  <div class="mt-3"><label class="form-label">Or type a barcode</label>
-    <div class="input-group mw-input"><input class="form-control" type="text" id="bman" inputmode="numeric"><button type="button" class="btn btn-outline-primary" id="bmanbtn">Add</button></div></div>
-  <div id="bnew" class="hidden card card-body bg-body-tertiary mt-3">
-    <p><b>New barcode <span id="bcode"></span></b> – enter the details to register it.</p>
-    <div class="row g-3 mb-3"><div class="col-sm-8"><label class="form-label">Product name</label><input class="form-control" type="text" id="bname"></div><div class="col-sm-4"><label class="form-label">Price</label><input class="form-control" type="text" id="bprice" inputmode="decimal"></div></div>
-    <button type="button" class="btn btn-primary align-self-start" id="bsave">Register and count</button>
+<div id="p-barcode" class="card card-body mb-4">
+  <div class="row g-4">
+    <div class="col-lg-6 order-lg-2">
+      <div class="cam"><video id="bv" muted playsinline></video><div class="reticle"></div><div class="hint" id="bhint">Camera is off</div></div>
+    </div>
+    <div class="col-lg-6 order-lg-1 d-flex flex-column">
+      <h2 class="h5">Count stock by scanning</h2>
+      <p class="text-body-secondary">Point the camera at each item. A known barcode adds the units below: 1 per item, or the size of a carton. A product is never created twice.</p>
+      <div class="row g-3 mb-3 align-items-end">
+        <div class="col-auto"><label class="form-label" for="bqty">Units per scan</label><input class="form-control w-qty" type="text" id="bqty" inputmode="numeric" value="1"></div>
+        <div class="col-auto d-flex gap-2"><button type="button" class="btn btn-primary d-inline-flex align-items-center gap-2" id="bstart">{{ ico('scan') }} Start camera</button><button type="button" class="btn btn-outline-secondary hidden" id="bstop">Stop</button></div>
+      </div>
+      <div><label class="form-label" for="bman">Or type a barcode</label>
+        <div class="input-group mw-input"><input class="form-control" type="text" id="bman" inputmode="numeric" autocomplete="off"><button type="button" class="btn btn-outline-primary" id="bmanbtn">Add</button></div></div>
+      <div id="bnew" class="hidden card card-body bg-body-tertiary mt-3">
+        <p class="mb-2"><b>New barcode <span id="bcode"></span></b>. Enter the details to register it.</p>
+        <div class="row g-3 mb-3"><div class="col-sm-8"><label class="form-label" for="bname">Product name</label><input class="form-control" type="text" id="bname"></div><div class="col-sm-4"><label class="form-label" for="bprice">Price</label><input class="form-control" type="text" id="bprice" inputmode="decimal"></div></div>
+        <button type="button" class="btn btn-primary align-self-start" id="bsave">Register and count</button>
+      </div>
+      <div id="blog" class="mt-3" aria-live="polite"></div>
+    </div>
   </div>
-  <div id="blog" class="mt-2"></div>
 </div>
 
 <!-- PHOTO / SCENT -->
-<form method="post" enctype="multipart/form-data" class="card card-body hidden mb-3" id="p-photo">
+<form method="post" enctype="multipart/form-data" class="card card-body hidden mb-4" id="p-photo">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <input type="hidden" name="method" id="pmethod" value="photo">
   <input type="hidden" name="signature" id="psig">
-  <h2 class="h5" id="ptitle">Register by photo</h2>
-  <p class="text-body-secondary" id="pnote">Take a picture of the product, then enter how many you have.</p>
-  <div class="cam mb-3"><video id="pv" muted playsinline></video><canvas id="pc" class="hidden"></canvas><div class="hint" id="phint">Camera is off</div></div>
-  <div class="d-flex gap-2 flex-wrap btn-stack-sm">
-    <button type="button" class="btn btn-outline-primary" id="pstart">Start camera</button>
-    <button type="button" class="btn btn-primary hidden" id="psnap">Take photo</button>
-    <button type="button" class="btn btn-outline-secondary hidden" id="pretake">Retake</button>
-    <label class="btn btn-outline-primary mb-0 text-capitalize-none">Choose a picture<input type="file" id="pfile" accept="image/*" capture="environment" class="hidden"></label>
+  <div class="row g-4">
+    <div class="col-lg-6 order-lg-2">
+      <div class="cam mb-3"><video id="pv" muted playsinline></video><canvas id="pc" class="hidden"></canvas><div class="hint" id="phint">Camera is off</div></div>
+      <div class="d-flex gap-2 flex-wrap btn-stack-sm">
+        <button type="button" class="btn btn-outline-primary" id="pstart">Start camera</button>
+        <button type="button" class="btn btn-primary hidden" id="psnap">Take photo</button>
+        <button type="button" class="btn btn-outline-secondary hidden" id="pretake">Retake</button>
+        <label class="btn btn-outline-primary mb-0 text-capitalize-none">Choose a picture<input type="file" id="pfile" accept="image/*" capture="environment" class="hidden"></label>
+      </div>
+    </div>
+    <div class="col-lg-6 order-lg-1">
+      <h2 class="h5" id="ptitle">Register by photo</h2>
+      <p class="text-body-secondary" id="pnote">Take a picture of the product, then enter how many you have.</p>
+      <div class="row g-3 mb-3"><div class="col-sm-8"><label class="form-label" for="pname">Product name</label><input class="form-control" type="text" id="pname" name="name" required></div><div class="col-sm-4"><label class="form-label" for="pprice">Price</label><input class="form-control" type="text" id="pprice" name="price" inputmode="decimal" required></div></div>
+      <div class="mb-3 hidden" id="scentf"><label class="form-label" for="pscent">Scent</label><input class="form-control" type="text" id="pscent" name="scent" placeholder="For example, lavender and vanilla"></div>
+      <div class="row g-3 mb-4"><div class="col-sm-6"><label class="form-label" for="pstock">How many</label><input class="form-control" type="text" id="pstock" name="stock" inputmode="numeric" value="1" required></div><div class="col-sm-6"><label class="form-label" for="preorder">Reorder level</label><input class="form-control" type="text" id="preorder" name="reorder_level" inputmode="numeric" value="5"></div></div>
+      <button class="btn btn-primary" id="psave" disabled>Save product</button>
+      <div class="form-text mt-2">Save unlocks once a photo is taken.</div>
+    </div>
   </div>
-  <div class="row g-3 mt-1 mb-3"><div class="col-sm-8"><label class="form-label">Product name</label><input class="form-control" type="text" name="name" required></div><div class="col-sm-4"><label class="form-label">Price</label><input class="form-control" type="text" name="price" inputmode="decimal" required></div></div>
-  <div class="mb-3 hidden" id="scentf"><label class="form-label">Scent</label><input class="form-control" type="text" name="scent" placeholder="e.g. Lavender and vanilla"></div>
-  <div class="row g-3 mb-3"><div class="col-sm-6"><label class="form-label">How many (enter manually)</label><input class="form-control" type="text" name="stock" inputmode="numeric" value="1" required></div><div class="col-sm-6"><label class="form-label">Reorder level</label><input class="form-control" type="text" name="reorder_level" inputmode="numeric" value="5"></div></div>
-  <button class="btn btn-primary align-self-start" id="psave" disabled>Save product</button>
 </form>
 
 <!-- MANUAL: no camera needed -->
-<form method="post" class="card card-body hidden mb-3" id="p-manual">
+<form method="post" class="card card-body hidden mb-4" id="p-manual">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <input type="hidden" name="method" value="manual">
-  <h2 class="h5">Add a product by typing</h2>
-  <p class="text-body-secondary">No camera needed. Add a barcode or SKU if the product has one, so it can be scanned or imported later.</p>
-  <div class="row g-3 mb-3"><div class="col-sm-8"><label class="form-label">Product name</label><input class="form-control" type="text" name="name" maxlength="150" required></div><div class="col-sm-4"><label class="form-label">Price</label><input class="form-control" type="text" name="price" inputmode="decimal" required></div></div>
-  <div class="row g-3 mb-3"><div class="col-sm-4"><label class="form-label">How many</label><input class="form-control" type="text" name="stock" inputmode="numeric" value="1" required></div><div class="col-sm-4"><label class="form-label">Reorder level</label><input class="form-control" type="text" name="reorder_level" inputmode="numeric" value="5"></div><div class="col-sm-4"><label class="form-label">SKU (optional)</label><input class="form-control" type="text" name="sku" maxlength="60"></div></div>
-  <div class="mb-3"><label class="form-label">Barcode (optional)</label><input class="form-control mw-input" type="text" name="barcode" maxlength="64" inputmode="numeric"></div>
-  <button class="btn btn-primary align-self-start">Save product</button>
+  <div class="mw-form">
+    <h2 class="h5">Add a product by typing</h2>
+    <p class="text-body-secondary">No camera needed. Add a barcode or SKU if the product has one, so it can be scanned or imported later.</p>
+    <div class="row g-3 mb-3"><div class="col-sm-8"><label class="form-label" for="mname">Product name</label><input class="form-control" type="text" id="mname" name="name" maxlength="150" required></div><div class="col-sm-4"><label class="form-label" for="mprice">Price</label><input class="form-control" type="text" id="mprice" name="price" inputmode="decimal" required></div></div>
+    <div class="row g-3 mb-3"><div class="col-sm-4"><label class="form-label" for="mstock">How many</label><input class="form-control" type="text" id="mstock" name="stock" inputmode="numeric" value="1" required></div><div class="col-sm-4"><label class="form-label" for="mreorder">Reorder level</label><input class="form-control" type="text" id="mreorder" name="reorder_level" inputmode="numeric" value="5"></div><div class="col-sm-4"><label class="form-label" for="msku">SKU <span class="text-body-secondary fw-normal">(optional)</span></label><input class="form-control" type="text" id="msku" name="sku" maxlength="60"></div></div>
+    <div class="mb-4"><label class="form-label" for="mbarcode">Barcode <span class="text-body-secondary fw-normal">(optional)</span></label><input class="form-control mw-input" type="text" id="mbarcode" name="barcode" maxlength="64" inputmode="numeric"></div>
+    <button class="btn btn-primary">Save product</button>
+  </div>
 </form>
 
 <!-- IMPORT: many products at once -->
-<form method="post" enctype="multipart/form-data" action="{{ url_for('ws.products_import') }}" class="card card-body hidden mb-3" id="p-import">
+<form method="post" enctype="multipart/form-data" action="{{ url_for('ws.products_import') }}" class="card card-body hidden mb-4" id="p-import">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-  <h2 class="h5">Import a delivery or stock count</h2>
-  <p class="text-body-secondary">Upload a CSV file (Excel: <i>Save as CSV</i>) or paste a list. Columns: <b>name, price, quantity, barcode, sku, reorder_level</b>. Rows that match an existing product (by barcode, SKU or name) add to its stock; new rows create products. <a href="{{ url_for('ws.import_template') }}">Download a template</a>.</p>
-  <div class="mb-3"><label class="form-label">CSV file</label><input class="form-control" type="file" name="file" accept=".csv,text/csv,text/plain"></div>
-  <div class="mb-3"><label class="form-label">Or paste rows</label><textarea class="form-control font-monospace" name="rows" rows="5" placeholder="name,price,quantity,barcode&#10;Bath soap 250g,1.50,24,6001234567890&#10;Cooking oil 2L,4.20,12"></textarea></div>
-  <div class="form-check mb-3"><input class="form-check-input" type="checkbox" name="update_prices" id="upd" value="1"><label class="form-check-label" for="upd">Also update prices of products that already exist</label></div>
-  <button class="btn btn-primary align-self-start">Import</button>
+  <div class="row g-4">
+    <div class="col-lg-7">
+      <h2 class="h5">Import a delivery or stock count</h2>
+      <p class="text-body-secondary">Upload a CSV file (in Excel, use Save as CSV) or paste a list. Rows that match an existing product by barcode, SKU or name add to its stock. New rows create products.</p>
+      <div class="mb-3"><label class="form-label" for="ifile">CSV file</label><input class="form-control" type="file" id="ifile" name="file" accept=".csv,text/csv,text/plain"></div>
+      <div class="mb-3"><label class="form-label" for="irows">Or paste rows</label><textarea class="form-control font-monospace" id="irows" name="rows" rows="5" placeholder="name,price,quantity,barcode&#10;Bath soap 250g,1.50,24,6001234567890&#10;Cooking oil 2L,4.20,12"></textarea></div>
+      <div class="form-check mb-4"><input class="form-check-input" type="checkbox" name="update_prices" id="upd" value="1"><label class="form-check-label" for="upd">Also update prices of products that already exist</label></div>
+      <button class="btn btn-primary d-inline-flex align-items-center gap-2">{{ ico('upload') }} Import</button>
+    </div>
+    <div class="col-lg-5">
+      <div class="card card-body bg-body-tertiary h-100 shadow-none">
+        <h3 class="h6 mb-2">Columns</h3>
+        <dl class="small mb-3 import-cols">
+          <dt>name</dt><dd>Needed for new products</dd>
+          <dt>price</dt><dd>Needed for new products</dd>
+          <dt>quantity</dt><dd>Units to add (qty and stock also work)</dd>
+          <dt>barcode, sku</dt><dd>Optional, used to match existing products</dd>
+          <dt>reorder_level</dt><dd>Optional, defaults to 5</dd>
+        </dl>
+        <p class="small text-body-secondary mb-3">Commas, semicolons or tabs all work, and the header row is optional. Bad rows are skipped and listed by line number.</p>
+        <a class="btn btn-sm btn-outline-secondary align-self-start d-inline-flex align-items-center gap-2" href="{{ url_for('ws.import_template') }}">{{ ico('download') }} Download template</a>
+      </div>
+    </div>
+  </div>
 </form>
 
-<div class="card"><div class="table-responsive"><table class="table align-middle mb-0"><thead><tr><th>Product</th><th>Recognised by</th><th>Price</th><th>In stock</th><th>Add stock</th>{% if current_user.role=='admin' %}<th></th>{% endif %}</tr></thead><tbody>
-{% for p in items %}<tr>
-<td class="text-nowrap"><div class="d-flex align-items-center">{% if p.photo %}<img class="thumb" src="{{ url_for('ws.product_photo', pid=p.id) }}" alt="">{% endif %}<div><span class="fw-semibold">{{ p.name }}</span>{% if p.scent %}<br><span class="text-body-secondary small">{{ p.scent }}</span>{% endif %}</div></div></td>
-<td>{{ (p.method or 'photo')|capitalize }}{% if p.barcode %}<br><span class="text-body-secondary small">{{ p.barcode }}</span>{% endif %}</td>
-<td>{{ '%.2f'|format(p.price) }}</td>
-<td><span class="badge text-bg-{{ 'danger' if p.stock <= p.reorder_level else 'success' }}">{{ p.stock }}</span></td>
-<td><form method="post" action="{{ url_for('ws.restock', pid=p.id) }}" class="input-group input-group-sm w-qty"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input class="form-control" type="text" name="qty" inputmode="numeric" placeholder="Qty"><button class="btn btn-outline-primary">Add</button></form></td>
-{% if current_user.role=='admin' %}<td class="text-end"><form method="post" action="{{ url_for('ws.product_delete', pid=p.id) }}" onsubmit="return confirm('Remove this product?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-danger">Remove</button></form></td>{% endif %}</tr>
-{% else %}<tr><td colspan="6" class="text-body-secondary">No products yet. Pick a way to register one above.</td></tr>{% endfor %}</tbody></table></div></div>
+<div class="card mb-4">
+  <div class="card-head flex-wrap">
+    <h2>Products <span class="text-body-secondary fw-normal">{{ items|length }}</span></h2>
+    {% if items|length > 5 %}<div class="input-group input-group-sm search-box"><span class="input-group-text">{{ ico('search') }}</span><input class="form-control" type="search" id="pfilter" placeholder="Find a product" aria-label="Find a product"></div>{% endif %}
+  </div>
+  <div class="table-responsive"><table class="table align-middle" id="ptable"><thead><tr><th>Product</th><th class="d-none d-md-table-cell">Recognised by</th><th class="text-end">Price</th><th>In stock</th><th>Add stock</th>{% if current_user.role=='admin' %}<th><span class="visually-hidden">Remove</span></th>{% endif %}</tr></thead><tbody>
+{% for p in items %}<tr data-q="{{ (p.name ~ ' ' ~ (p.barcode or '') ~ ' ' ~ (p.sku or ''))|lower }}">
+<td><div class="d-flex align-items-center">{% if p.photo %}<img class="thumb" src="{{ url_for('ws.product_photo', pid=p.id) }}" alt="">{% endif %}<div class="min-w-0"><span class="fw-semibold">{{ p.name }}</span>{% if p.sku %} <span class="text-body-secondary small">{{ p.sku }}</span>{% endif %}{% if p.scent %}<br><span class="text-body-secondary small">{{ p.scent }}</span>{% endif %}</div></div></td>
+<td class="d-none d-md-table-cell">{{ (p.method or 'photo')|capitalize }}{% if p.barcode %}<br><span class="text-body-secondary small">{{ p.barcode }}</span>{% endif %}</td>
+<td class="text-end">{{ '{:,.2f}'.format(p.price) }}</td>
+<td class="text-nowrap"><span class="badge text-bg-{{ 'danger' if p.stock <= 0 else ('warning' if p.stock <= p.reorder_level else 'success') }}">{{ p.stock }}</span>{% if p.stock <= 0 %} <span class="small text-body-secondary">out</span>{% elif p.stock <= p.reorder_level %} <span class="small text-body-secondary">low</span>{% endif %}</td>
+<td><form method="post" action="{{ url_for('ws.restock', pid=p.id) }}" class="input-group input-group-sm w-qty"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input class="form-control" type="text" name="qty" inputmode="numeric" placeholder="Qty" aria-label="Units to add to {{ p.name }}"><button class="btn btn-outline-primary">Add</button></form></td>
+{% if current_user.role=='admin' %}<td class="text-end"><form method="post" action="{{ url_for('ws.product_delete', pid=p.id) }}" onsubmit="return confirm('Remove {{ p.name|e }}? Its sales history is kept.')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-link link-danger text-decoration-none">Remove</button></form></td>{% endif %}</tr>
+{% else %}<tr><td colspan="6" class="text-body-secondary">No products yet. Pick a way to register one above.</td></tr>{% endfor %}
+<tr class="hidden" id="pnone"><td colspan="6" class="text-body-secondary">No product matches that search.</td></tr>
+</tbody></table></div>
+</div>
 
 {% if history %}
-<h2 class="h5 mt-4">Recent stock added</h2>
-<div class="card"><div class="table-responsive"><table class="table align-middle mb-0"><thead><tr><th>When</th><th>Product</th><th>Added</th><th>How</th><th>By</th></tr></thead><tbody>
-{% for m in history %}<tr><td class="text-nowrap text-body-secondary small">{{ m.created_at.strftime('%d %b %H:%M') }}</td><td>{{ m.product.name }}</td><td><span class="badge text-bg-success">+{{ m.quantity }}</span></td><td>{{ m.source_label }}{% if m.note %}<br><span class="text-body-secondary small">{{ m.note }}</span>{% endif %}</td><td class="text-body-secondary">{{ m.user.name if m.user else '' }}</td></tr>{% endfor %}
-</tbody></table></div></div>
+<div class="card">
+  <div class="card-head"><h2>Recent stock added</h2><span class="meta">Last {{ history|length }}</span></div>
+  <div class="table-responsive"><table class="table align-middle"><thead><tr><th>When</th><th>Product</th><th class="text-end">Added</th><th>How</th><th>By</th></tr></thead><tbody>
+{% for m in history %}<tr><td class="text-nowrap text-body-secondary">{{ m.created_at.strftime('%d %b, %H:%M') }}</td><td class="fw-semibold">{{ m.product.name }}</td><td class="text-end"><span class="badge text-bg-success">+{{ m.quantity }}</span></td><td>{{ m.source_label }}{% if m.note %}<br><span class="text-body-secondary small">{{ m.note }}</span>{% endif %}</td><td class="text-body-secondary">{{ m.user.name if m.user else '' }}</td></tr>{% endfor %}
+</tbody></table></div>
+</div>
 {% endif %}
 
 <script src="{{ url_for('static', filename='capture.js') }}"></script>
@@ -160,6 +210,13 @@
   $('psnap').onclick = () => showCaptured(TT.frameToCanvas($('pv')));
   $('pretake').onclick = () => { $('psig').value = ''; $('psave').disabled = true; $('pretake').classList.add('hidden'); $('pstart').click(); };
   $('pfile').onchange = async e => { if (e.target.files[0]) { try { showCaptured(await TT.fileToCanvas(e.target.files[0])); } catch (x) { alert(x.message); } } };
+  // filter the product table as you type
+  if ($('pfilter')) $('pfilter').oninput = e => {
+    const q = e.target.value.trim().toLowerCase(); let shown = 0;
+    document.querySelectorAll('#ptable tbody tr[data-q]').forEach(tr => { const on = !q || tr.dataset.q.includes(q); tr.classList.toggle('hidden', !on); shown += on; });
+    $('pnone').classList.toggle('hidden', shown > 0);
+  };
+
   // open the tab named in ?tab=… (the import form sends you back to it)
   const want = new URLSearchParams(location.search).get('tab');
   const tabBtn = want && document.querySelector('#tabs button[data-m="' + want + '"]');

@@ -1,8 +1,11 @@
 {% extends "shell.html" %}
+{% block title %}Quick sell · {{ current_user.tenant.name }}{% endblock %}
 {% block content %}
-<div class="page-head"><h1>Quick sell</h1><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('ws.home') }}">Back</a></div>
+<div class="page-head"><div><h1>Quick sell</h1><p class="sub">Scan the barcode or snap the product, confirm the match, and sell.</p></div></div>
 
-<div class="card card-body mb-3">
+<div class="row g-4 align-items-start">
+<div class="col-lg-7">
+<div class="card card-body">
   <div class="cam mb-3"><video id="v" muted playsinline></video><canvas id="c" class="hidden"></canvas><div class="hint" id="hint">Camera is off</div></div>
   <div class="d-flex gap-2 flex-wrap btn-stack-sm">
     <button class="btn btn-primary btn-lg" id="start" type="button">Open camera</button>
@@ -10,10 +13,13 @@
     <button class="btn btn-outline-primary btn-lg hidden" id="scan" type="button">Scan barcode</button>
     <label class="btn btn-outline-primary btn-lg mb-0 text-capitalize-none">Use a picture<input type="file" id="file" accept="image/*" capture="environment" class="hidden"></label>
   </div>
-  <div class="mt-3"><label class="form-label">Or type a barcode</label><div class="input-group mw-input"><input class="form-control" type="text" id="man" inputmode="numeric"><button type="button" class="btn btn-outline-primary" id="manbtn">Find</button></div></div>
+  <div class="mt-3"><label class="form-label" for="man">Or type a barcode</label><div class="input-group mw-input"><input class="form-control" type="text" id="man" autocomplete="off" inputmode="numeric"><button type="button" class="btn btn-outline-primary" id="manbtn">Find</button></div></div>
 </div>
 
-<div id="msg"></div>
+</div>
+<div class="col-lg-5 qs-side">
+<div id="msg" aria-live="polite"></div>
+<div id="qsempty" class="card card-body text-body-secondary small">Matches appear here. Pick the right product, enter the quantity and how the customer is paying.</div>
 <div id="cands"></div>
 
 <div id="sell" class="card card-body hidden">
@@ -36,6 +42,9 @@
   <button class="btn btn-primary btn-lg" id="confirm" type="button">Sell</button>
 </div>
 
+</div>
+</div>
+
 <script src="{{ url_for('static', filename='capture.js') }}"></script>
 <script>
 (() => {
@@ -53,6 +62,7 @@
 
   function showCands(list) {
     $('cands').innerHTML = ''; $('sell').classList.add('hidden'); chosen = null;
+    $('qsempty').classList.toggle('hidden', list.length > 0);
     list.forEach((p, i) => {
       const b = document.createElement('button'); b.type = 'button'; b.className = 'cand';
       b.innerHTML = (p.photo ? '<img class="thumb" src="' + p.photo + '" alt="">' : '<span class="thumb"></span>') +
@@ -102,7 +112,7 @@
     if (r.error) { say(r.error, 'error'); $('confirm').disabled = false; return; }
     say(r.warning || ('Sold ' + $('qty').value + ' × ' + r.name + ' for ' + r.total + '. ' + r.stock + ' left. Printing receipt…'), r.warning ? 'error' : 'ok');
     printReceipt(r.receipt);
-    $('sell').classList.add('hidden'); $('cands').innerHTML = ''; chosen = null;
+    $('sell').classList.add('hidden'); $('cands').innerHTML = ''; chosen = null; $('qsempty').classList.remove('hidden');
   };
   // print through a hidden frame so the camera page stays open for the next sale
   function printReceipt(url) {

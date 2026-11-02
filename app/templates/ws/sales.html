@@ -1,48 +1,66 @@
 {% extends "shell.html" %}
+{% from "_ui.html" import ico %}
+{% block title %}Sales · {{ current_user.tenant.name }}{% endblock %}
 {% block content %}
-<div class="page-head"><h1>Sales</h1></div>
-
-<form method="post" class="card card-body mb-3"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-<h2 class="h5 mb-3">New sale</h2>
-<div class="row g-3 mb-3"><div class="col-md-8"><label class="form-label">Product</label><select class="form-select" name="product_id" required><option value="">Choose</option>{% for p in products %}<option value="{{ p.id }}">{{ p.name }} ({{ p.stock }} left, {{ '%.2f'|format(p.price) }})</option>{% endfor %}</select></div>
-<div class="col-md-4"><label class="form-label">Quantity</label><input class="form-control" type="text" name="quantity" inputmode="numeric" value="1" required></div></div>
-<div class="row g-3 mb-3"><div class="col-md-6"><label class="form-label">Client (optional for cash sales)</label><select class="form-select" name="client_id"><option value="">Walk-in</option>{% for c in clients %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}</select></div>
-<div class="col-md-6"><label class="form-label">Amount paid (blank = paid in full)</label><input class="form-control" type="text" name="paid" inputmode="decimal"></div></div>
-<div class="row g-3 mb-3"><div class="col-md-4"><label class="form-label">Payment method</label><select class="form-select" name="method" id="pm"><option value="cash">Cash</option>{% if current_user.tenant.payment and current_user.tenant.payment.ecocash_enabled %}<option value="ecocash">EcoCash</option>{% endif %}<option value="onemoney">OneMoney (NetOne)</option></select></div>
-<div class="col-md-4 hidden" id="pphone"><label class="form-label">Customer mobile number</label><input class="form-control" type="tel" name="phone" inputmode="tel" placeholder="0771234567"></div>
-<div class="col-md-4 hidden" id="pref"><label class="form-label">OneMoney transaction code</label><input class="form-control" type="text" name="payment_ref" maxlength="60"></div></div>
-<div class="form-text mb-3 hidden" id="phint">EcoCash: the customer gets a PIN prompt on their phone. Keep this page open until it confirms.</div>
-<button class="btn btn-primary align-self-start">Record sale and print receipt</button></form>
-<script>(()=>{const m=document.getElementById("pm"),sh=(i,on)=>document.getElementById(i).classList.toggle("hidden",!on);const f=()=>{sh("pphone",m.value!=="cash");sh("pref",m.value==="onemoney");sh("phint",m.value==="ecocash")};m.onchange=f;f()})();</script>
-
-<div class="row g-3 mb-3">
-  <div class="col-6 col-lg-3"><div class="card stat h-100"><div class="k">Sales</div><div class="v">{{ summary.count }}</div></div></div>
-  <div class="col-6 col-lg-3"><div class="card stat h-100"><div class="k">Total value</div><div class="v">{{ '%.2f'|format(summary.total) }}</div></div></div>
-  <div class="col-6 col-lg-3"><div class="card stat h-100"><div class="k">Received</div><div class="v">{{ '%.2f'|format(summary.paid) }}</div></div></div>
-  <div class="col-6 col-lg-3"><div class="card stat h-100"><div class="k">Still owed</div><div class="v">{{ '%.2f'|format(summary.owed) }}</div></div></div>
+<div class="page-head">
+  <div><h1>Sales</h1><p class="sub">Every sale with its receipt, payment and balance.</p></div>
+  <div class="actions">
+    <a class="btn btn-outline-primary d-inline-flex align-items-center gap-2" href="{{ url_for('ws.quick_sell') }}">{{ ico('bolt') }} Quick sell</a>
+    <button class="btn btn-primary d-inline-flex align-items-center gap-2" type="button" data-bs-toggle="collapse" data-bs-target="#newsale" aria-expanded="{{ 'true' if not items else 'false' }}" aria-controls="newsale">{{ ico('plus') }} New sale</button>
+  </div>
 </div>
 
-<ul class="nav nav-pills mb-3 gap-1">
+<div class="collapse{{ ' show' if not items }}" id="newsale">
+<form method="post" class="card card-body mb-4"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <h2 class="h5 mb-1">New sale</h2>
+  <p class="text-body-secondary small mb-3">For selling from a list. To scan or snap the product instead, use Quick sell.</p>
+  <div class="row g-3 mb-3">
+    <div class="col-md-8"><label class="form-label" for="sp">Product</label><select class="form-select" id="sp" name="product_id" required><option value="">Choose a product</option>{% for p in products %}<option value="{{ p.id }}">{{ p.name }} ({{ p.stock }} left, {{ '%.2f'|format(p.price) }})</option>{% endfor %}</select></div>
+    <div class="col-md-4"><label class="form-label" for="sq">Quantity</label><input class="form-control" id="sq" type="text" name="quantity" inputmode="numeric" value="1" required></div>
+  </div>
+  <div class="row g-3 mb-3">
+    <div class="col-md-6"><label class="form-label" for="sc">Client <span class="text-body-secondary fw-normal">(needed for credit)</span></label><select class="form-select" id="sc" name="client_id"><option value="">Walk-in</option>{% for c in clients %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}</select></div>
+    <div class="col-md-6"><label class="form-label" for="sa">Amount paid <span class="text-body-secondary fw-normal">(blank means paid in full)</span></label><input class="form-control" id="sa" type="text" name="paid" inputmode="decimal"></div>
+  </div>
+  <div class="row g-3 mb-3">
+    <div class="col-md-4"><label class="form-label" for="pm">Payment method</label><select class="form-select" name="method" id="pm"><option value="cash">Cash</option>{% if current_user.tenant.payment and current_user.tenant.payment.ecocash_enabled %}<option value="ecocash">EcoCash</option>{% endif %}<option value="onemoney">OneMoney (NetOne)</option></select></div>
+    <div class="col-md-4 hidden" id="pphone"><label class="form-label" for="sphone">Customer mobile number</label><input class="form-control" id="sphone" type="tel" name="phone" inputmode="tel" placeholder="0771234567"></div>
+    <div class="col-md-4 hidden" id="pref"><label class="form-label" for="sref">OneMoney transaction code</label><input class="form-control" id="sref" type="text" name="payment_ref" maxlength="60"></div>
+  </div>
+  <div class="form-text mb-3 hidden" id="phint">EcoCash: the customer gets a PIN prompt on their phone. Keep this page open until it confirms.</div>
+  <div><button class="btn btn-primary">Record sale and print receipt</button></div>
+</form>
+</div>
+<script>(()=>{const m=document.getElementById("pm"),sh=(i,on)=>document.getElementById(i).classList.toggle("hidden",!on);const f=()=>{sh("pphone",m.value!=="cash");sh("pref",m.value==="onemoney");sh("phint",m.value==="ecocash")};m.onchange=f;f()})();</script>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3"><div class="card stat h-100"><div class="k">Sales</div><div class="v">{{ '{:,}'.format(summary.count) }}</div></div></div>
+  <div class="col-6 col-lg-3"><div class="card stat h-100"><div class="k">Total value</div><div class="v">{{ '{:,.2f}'.format(summary.total) }}</div></div></div>
+  <div class="col-6 col-lg-3"><div class="card stat h-100"><div class="k">Received</div><div class="v">{{ '{:,.2f}'.format(summary.paid) }}</div></div></div>
+  <div class="col-6 col-lg-3"><a class="card stat h-100 text-decoration-none text-reset" href="{{ url_for('ws.debtors') }}"><div class="k">Still owed</div><div class="v{{ ' text-danger' if summary.owed > 0 }}">{{ '{:,.2f}'.format(summary.owed) }}</div></a></div>
+</div>
+
+<ul class="nav nav-pills mb-3 d-inline-flex">
   <li class="nav-item"><a class="nav-link {{ 'active' if kind=='all' }}" href="{{ url_for('ws.sales') }}">All <span class="opacity-75 ms-1">{{ counts.all }}</span></a></li>
   <li class="nav-item"><a class="nav-link {{ 'active' if kind=='cash' }}" href="{{ url_for('ws.sales', type='cash') }}">Cash <span class="opacity-75 ms-1">{{ counts.cash }}</span></a></li>
   <li class="nav-item"><a class="nav-link {{ 'active' if kind=='credit' }}" href="{{ url_for('ws.sales', type='credit') }}">Credit <span class="opacity-75 ms-1">{{ counts.credit }}</span></a></li>
 </ul>
 
-<div class="card"><div class="table-responsive"><table class="table table-hover align-middle mb-0"><thead><tr><th>Receipt</th><th>Date</th><th>Item</th><th>Client</th><th>Type</th><th class="text-end">Total</th><th class="text-end">Paid</th><th class="text-end">Balance</th><th></th></tr></thead><tbody>
-{% for s in items %}<tr>
-<td class="text-nowrap">#{{ '%06d'|format(numbers[s.id]) }}</td>
-<td class="text-nowrap">{{ s.created_at.strftime('%d %b %Y %H:%M') }}</td><td class="text-nowrap">{{ s.product_name }} &times; {{ s.quantity }}</td>
-<td>{{ s.client.name if s.client else 'Walk-in' }}</td>
-<td><span class="badge text-bg-{{ 'success' if s.kind=='Cash' else ('danger' if s.kind=='Credit' else 'warning') }}">{{ s.kind }}</span>{% if s.payment_method in ('ecocash','onemoney') %} <span class="badge text-bg-info">{{ s.method_label }}</span>{% endif %}</td>
-<td class="text-end">{{ '%.2f'|format(s.total) }}</td><td class="text-end">{{ '%.2f'|format(s.paid) }}</td>
-<td class="text-end">{% if s.balance > 0 %}<span class="badge text-bg-danger">{{ '%.2f'|format(s.balance) }}</span>{% else %}&ndash;{% endif %}</td>
-<td class="text-end text-nowrap"><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('ws.receipt', sid=s.id) }}" target="_blank" rel="noopener">Receipt</a>
+<div class="card"><div class="table-responsive"><table class="table align-middle"><thead><tr><th>Receipt</th><th>Sale</th><th>Status</th><th class="text-end">Total</th><th class="text-end">Paid</th><th class="text-end">Balance</th><th><span class="visually-hidden">Actions</span></th></tr></thead><tbody>
+{% for s in items %}{% set no = '%06d'|format(numbers[s.id]) %}<tr>
+<td class="text-nowrap"><a class="fw-semibold text-decoration-none" href="{{ url_for('ws.receipt', sid=s.id) }}" target="_blank" rel="noopener">#{{ no }}</a><div class="small text-body-secondary">{{ s.created_at.strftime('%d %b %Y, %H:%M') }}</div></td>
+<td><div class="fw-semibold text-nowrap">{{ s.product_name }} &times; {{ s.quantity }}</div><div class="small text-body-secondary">{{ s.client.name if s.client else 'Walk-in' }}</div></td>
+<td class="text-nowrap"><span class="badge text-bg-{{ 'success' if s.kind=='Cash' else ('danger' if s.kind=='Credit' else 'warning') }}">{{ s.kind }}</span>{% if s.payment_method in ('ecocash','onemoney') %} <span class="badge text-bg-info">{{ s.method_label }}</span>{% endif %}</td>
+<td class="text-end">{{ '{:,.2f}'.format(s.total) }}</td>
+<td class="text-end text-body-secondary">{{ '{:,.2f}'.format(s.paid) }}</td>
+<td class="text-end">{% if s.balance > 0 %}<span class="fw-semibold text-danger">{{ '{:,.2f}'.format(s.balance) }}</span>{% else %}<span class="text-body-secondary">&ndash;</span>{% endif %}</td>
+<td class="text-end text-nowrap"><a class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" href="{{ url_for('ws.receipt', sid=s.id) }}" target="_blank" rel="noopener" aria-label="Receipt {{ no }}">{{ ico('print') }}<span class="d-none d-xl-inline">Receipt</span></a>
 {% if s.payment_method=='ecocash' and s.payment_status=='pending' %}<form method="post" class="d-inline" action="{{ url_for('ws.check_payment', sid=s.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-primary">Check payment</button></form>{% endif %}
 {% if s.payment_method=='ecocash' and s.payment_status=='paid' and current_user.role=='admin' %}<form method="post" class="d-inline" action="{{ url_for('ws.refund', sid=s.id) }}" onsubmit="return confirm('Refund {{ '%.2f'|format(s.paid) }} to {{ s.payment_phone }}?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-danger">Refund</button></form>{% endif %}</td></tr>
-{% else %}<tr><td colspan="9" class="text-body-secondary">No {{ kind if kind!='all' else '' }} sales yet.</td></tr>{% endfor %}</tbody></table></div></div>
+{% else %}<tr><td colspan="7" class="text-body-secondary">No {{ kind if kind!='all' else '' }} sales yet.</td></tr>{% endfor %}</tbody></table></div></div>
 
-{% if pages > 1 %}<div class="d-flex justify-content-center align-items-center gap-3 mt-3">
+{% if pages > 1 %}<nav class="d-flex justify-content-center align-items-center gap-3 mt-3" aria-label="Pages">
 {% if page > 1 %}<a class="btn btn-sm btn-outline-secondary" href="{{ url_for('ws.sales', type=kind, page=page-1) }}">Previous</a>{% endif %}
 <span class="text-body-secondary small">Page {{ page }} of {{ pages }}</span>
-{% if page < pages %}<a class="btn btn-sm btn-outline-secondary" href="{{ url_for('ws.sales', type=kind, page=page+1) }}">Next</a>{% endif %}</div>{% endif %}
+{% if page < pages %}<a class="btn btn-sm btn-outline-secondary" href="{{ url_for('ws.sales', type=kind, page=page+1) }}">Next</a>{% endif %}</nav>{% endif %}
 {% endblock %}

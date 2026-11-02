@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} · TylonERP{% endblock %}
+{% block body %}
+<main class="err">
+  <div class="err-card">
+    <div class="err-code">{{ code }}</div>
+    <h1>{{ title }}</h1>
+    <p>{{ message }}</p>
+    <div class="d-flex gap-2 flex-wrap justify-content-center">
+      <a class="btn btn-primary" href="{{ url_for('main.index') }}">Go to your workspace</a>
+      <button class="btn btn-outline-secondary" type="button" onclick="history.back()">Go back</button>
+    </div>
+  </div>
+</main>
+{% endblock %}

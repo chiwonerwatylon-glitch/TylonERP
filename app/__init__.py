@@ -11,7 +11,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from .config import load_settings
 from .security import init_security, limiter
 
-VERSION = "1.7.0"
+VERSION = "1.8.0"
 
 db = SQLAlchemy()
 login_manager = LoginManager()
@@ -114,6 +114,8 @@ def create_app(config=None):
         return {"app_version": VERSION, "plans": models.PLANS, "now": models.utcnow(),
                 "theme_style": _theme_style(), "auth_colors": _auth_colors()}
 
+    _register_error_pages(app)
+
     @app.get("/healthz")
     def healthz():
         db.session.execute(db.text("SELECT 1"))
@@ -123,6 +125,32 @@ def create_app(config=None):
         _bootstrap(app)
 
     return app
+
+
+ERROR_PAGES = {
+    400: ("That request did not make sense", "Something in the form or link was not right. Go back and try again."),
+    403: ("You do not have access to this page", "Ask an admin in your business if you think you should."),
+    404: ("This page does not exist", "The link may be old, or the item was removed."),
+    413: ("That file is too big", "Pictures must be 2 MB or smaller, and import files 1 MB or smaller."),
+    429: ("Too many attempts", "Wait a minute, then try again."),
+    500: ("Something went wrong on our side", "Your last action may not have been saved. Try again in a moment."),
+}
+
+
+def _register_error_pages(app):
+    from flask import render_template
+
+    def page(code):
+        title, message = ERROR_PAGES[code]
+        if code == 500:
+            db.session.rollback()
+        try:
+            return render_template("error.html", code=code, title=title, message=message), code
+        except Exception:  # never let the error page itself fail
+            return f"{code} {title}", code
+
+    for code in ERROR_PAGES:
+        app.register_error_handler(code, lambda e, code=code: page(code))
 
 
 def _mix(hex_a, hex_b, t):

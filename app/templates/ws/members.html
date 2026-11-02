@@ -1,17 +1,23 @@
 {% extends "shell.html" %}
+{% block title %}Members · {{ tenant.name }}{% endblock %}
 {% block content %}
-<div class="page-head"><h1>Members</h1><span class="badge text-bg-primary fs-6">{{ users|length }} / {{ tenant.max_users }}</span></div>
-{% if created %}<div class="card card-body mb-3"><p>Share these sign-in details with <b>{{ created[0].name }}</b>. The password is shown once.</p>
+<div class="page-head"><div><h1>Members</h1><p class="sub">People who can sign in to {{ tenant.name }}. The {{ tenant.plan_label }} plan allows {{ tenant.max_users }}; you have {{ users|length }}.</p></div></div>
+{% if created %}<div class="card card-body mb-4"><p>Share these sign-in details with <b>{{ created[0].name }}</b>. The password is shown once.</p>
 <label class="form-label">Sign-in page</label><div class="cred">{{ url_for('auth.login', slug=tenant.slug, _external=True) }}</div>
 <label class="form-label">Email</label><div class="cred">{{ created[0].email }}</div><label class="form-label">Temporary password</label><div class="cred">{{ created[1] }}</div></div>{% endif %}
-<form method="post" class="card card-body mb-3"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-<div class="row g-3 mb-3"><div class="col-md-6"><label class="form-label">Name</label><input class="form-control" type="text" name="name" required></div><div class="col-md-6"><label class="form-label">Email</label><input class="form-control" type="email" name="email" required></div></div>
-<div class="mb-3 mw-field"><label class="form-label">Role</label><select class="form-select" name="role"><option value="staff">Staff</option><option value="admin">Admin</option></select></div>
-<button class="btn btn-primary align-self-start">Add member</button></form>
-<div class="card"><div class="table-responsive"><table class="table align-middle mb-0"><thead><tr><th>Member</th><th>Role</th><th>Status</th><th></th></tr></thead><tbody>
+<div class="row g-4">
+<div class="col-lg-4"><form method="post" class="card card-body"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<h2 class="h5 mb-3">Add a member</h2>
+<div class="mb-3"><label class="form-label" for="mn">Name</label><input class="form-control" id="mn" type="text" name="name" required></div>
+<div class="mb-3"><label class="form-label" for="me">Email</label><input class="form-control" id="me" type="email" name="email" required></div>
+<div class="mb-4"><label class="form-label" for="mr">Role</label><select class="form-select" id="mr" name="role" aria-describedby="mrh"><option value="staff">Staff</option><option value="admin">Admin</option></select><div class="form-text" id="mrh">Staff sell, count stock and record payments. Admins also manage members and settings.</div></div>
+<div><button class="btn btn-primary">Add member</button></div></form></div>
+<div class="col-lg-8"><div class="card"><div class="table-responsive"><table class="table align-middle"><thead><tr><th>Member</th><th>Role</th><th>Status</th><th></th></tr></thead><tbody>
 {% for u in users %}<tr><td class="fw-semibold">{{ u.name }}<br><span class="text-body-secondary small fw-normal">{{ u.email }}</span></td><td>{{ u.role|capitalize }}</td>
 <td><span class="badge text-bg-{{ 'success' if u.is_active_flag else 'danger' }}">{{ 'Active' if u.is_active_flag else 'Disabled' }}</span></td>
 <td class="text-end">{% if u.id != current_user.id %}<div class="d-flex gap-2 justify-content-end flex-wrap">
 <form method="post" action="{{ url_for('ws.member_reset', uid=u.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-secondary">Reset password</button></form>
 <form method="post" action="{{ url_for('ws.member_toggle', uid=u.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-danger">{{ 'Disable' if u.is_active_flag else 'Enable' }}</button></form></div>{% endif %}</td></tr>{% endfor %}</tbody></table></div></div>
+</div>
+</div>
 {% endblock %}

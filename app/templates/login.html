@@ -19,16 +19,16 @@
     <form class="auth-card" method="post" autocomplete="on">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       {% if tenant %}<div class="d-flex align-items-center gap-3 mb-4">{% if b and b.logo %}<img class="logo logo-md" src="{{ url_for('tenant_public.login_logo', slug=tenant.slug) }}?v={{ b.updated_at.timestamp()|int }}" alt="">{% else %}<span class="mark mark-lg">{{ tenant.name[0]|upper }}</span>{% endif %}<span class="fs-5 fw-semibold">{{ tenant.name }}</span></div>
-      <h2 class="h3 mb-1">Sign in</h2>
-      <p class="text-body-secondary mb-4">to the {{ tenant.name }} workspace</p>{% else %}<h2 class="h3 mb-1">Welcome back</h2>
+      <h2 class="mb-1">Sign in</h2>
+      <p class="text-body-secondary mb-4">to the {{ tenant.name }} workspace</p>{% else %}<h2 class="mb-1">Welcome back</h2>
       <p class="text-body-secondary mb-4">Sign in to continue to your workspace.</p>{% endif %}
       {% with m = get_flashed_messages(with_categories=true) %}{% for c, t in m %}<div class="alert alert-{{ 'success' if c=='ok' else 'danger' }}" role="alert">{{ t }}</div>{% endfor %}{% endwith %}
       <div class="mb-3"><label class="form-label" for="email">Email</label>
         <input class="form-control form-control-lg" id="email" name="email" type="email" required autofocus autocomplete="username" placeholder="you@company.com" value="{{ request.form.email }}"></div>
       <div class="mb-3"><label class="form-label" for="password">Password</label>
         <div class="input-group input-group-lg"><input class="form-control" id="password" name="password" type="password" required autocomplete="current-password" placeholder="••••••••">
-        <button class="btn btn-outline-secondary" type="button" style="border-radius:0 .5rem .5rem 0" onclick="var i=document.getElementById('password');i.type=i.type==='password'?'text':'password';this.textContent=i.type==='password'?'Show':'Hide'">Show</button></div></div>
-      <div class="form-check mb-4"><input class="form-check-input" type="checkbox" name="remember" id="remember"><label class="form-check-label" for="remember" style="font-size:.9rem;font-weight:400;color:inherit">Keep me signed in</label></div>
+        <button class="btn btn-outline-secondary pw-toggle" type="button" aria-label="Show password" onclick="var i=document.getElementById('password');i.type=i.type==='password'?'text':'password';this.textContent=i.type==='password'?'Show':'Hide'">Show</button></div></div>
+      <div class="form-check mb-4"><input class="form-check-input" type="checkbox" name="remember" id="remember"><label class="form-check-label" for="remember">Keep me signed in</label></div>
       <button class="btn btn-primary btn-lg w-100" type="submit">Sign in</button>
     </form>
   </section>

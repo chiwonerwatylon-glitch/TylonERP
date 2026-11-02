@@ -1,5 +1,6 @@
 """Ways of adding stock: manual entry, scan with a quantity, CSV import, and the stock-in history."""
 import io
+import re
 from decimal import Decimal
 
 import pytest
@@ -176,3 +177,22 @@ def test_refunded_sale_is_not_a_debt(alpha, app, two_tenants):
 def test_tenant_user_on_admin_login_goes_to_their_page(client, two_tenants):
     r = client.post("/login", data={"email": two_tenants["alpha"]["email"], "password": "pw-12345678"})
     assert r.status_code == 302 and r.headers["Location"].endswith("/t/alpha")
+
+
+# ---------------------------------------------------------------- redesigned pages
+
+def test_dashboard_shows_takings_chart(alpha, two_tenants):
+    alpha.post("/t/alpha/app/quick-sell/confirm", json={"product_id": two_tenants["alpha"]["product"], "quantity": 2})
+    page = alpha.get("/t/alpha/app/").data
+    bars = re.findall(rb'class="bar(?: today| empty)?"', page)
+    assert b"Takings, last 30 days" in page and len(bars) == 14 and bars[-1] == b'class="bar today"'
+
+
+def test_designed_404_page(client):
+    r = client.get("/no-such-page")
+    assert r.status_code == 404 and b"This page does not exist" in r.data
+
+
+def test_fonts_are_served_locally(client):
+    for name in ("instrument-sans.woff2", "bricolage-grotesque.woff2"):
+        assert client.get(f"/static/fonts/{name}").status_code == 200

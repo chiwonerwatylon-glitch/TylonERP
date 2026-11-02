@@ -1,6 +1,6 @@
 {% extends "shell.html" %}
 {% block content %}
-<div class="page-head"><h1>Register tenant</h1></div>
+<div class="page-head"><div><h1>Register tenant</h1><p class="sub">Creates the organisation and its owner account. You get a temporary password to pass on.</p></div></div>
 <form method="post" class="card card-body mw-form">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <div class="mb-3"><label class="form-label">Organisation name</label><input class="form-control" type="text" name="name" required value="{{ form.name }}"></div>

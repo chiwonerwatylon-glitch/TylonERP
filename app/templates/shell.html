@@ -1,25 +1,36 @@
 {% extends "base.html" %}
 {% from "_ui.html" import ico, theme_menu %}
 {% macro item(ep_names, href, icon, label) -%}
-<a class="nav-link {{ 'active' if (request.endpoint or '') in ep_names }}" href="{{ href }}">{{ ico(icon) }}<span>{{ label }}</span></a>
+<a class="nav-link {{ 'active' if (request.endpoint or '') in ep_names }}" href="{{ href }}"{% if (request.endpoint or '') in ep_names %} aria-current="page"{% endif %}>{{ ico(icon) }}<span>{{ label }}</span></a>
 {%- endmacro %}
 {% macro tab(ep_names, href, icon, label) -%}
-<a class="{{ 'active' if (request.endpoint or '') in ep_names }}" href="{{ href }}">{{ ico(icon) }}<span>{{ label }}</span></a>
+<a class="{{ 'active' if (request.endpoint or '') in ep_names }}" href="{{ href }}"{% if (request.endpoint or '') in ep_names %} aria-current="page"{% endif %}>{{ ico(icon) }}<span>{{ label }}</span></a>
 {%- endmacro %}
 {% block body %}
 {% set tn = current_user.tenant.name if current_user.tenant else 'TylonERP' %}
+{% set home = url_for('admin.dashboard') if current_user.is_superadmin else url_for('ws.home') %}
+{% set sections = {
+  'admin.dashboard': 'Overview', 'admin.tenants': 'Tenants', 'admin.tenant_new': 'Tenants', 'admin.tenant_detail': 'Tenants',
+  'admin.tenant_plan': 'Tenants', 'admin.tenant_toggle': 'Tenants', 'admin.tenant_reset': 'Tenants', 'admin.system': 'System',
+  'ws.home': 'Dashboard', 'ws.quick_sell': 'Quick sell', 'ws.products': 'Stock', 'ws.clients': 'Clients', 'ws.sales': 'Sales',
+  'ws.receipt': 'Sales', 'ws.debtors': 'Debtors', 'ws.members': 'Members', 'ws.member_reset': 'Members', 'ws.payments': 'Payments',
+  'ws.branding': 'Login page', 'auth.change_password': 'Password'} %}
+<a class="visually-hidden-focusable position-absolute top-0 start-0 m-2 btn btn-primary" href="#content">Skip to content</a>
+
 <header class="appbar">
-  <div class="container-fluid px-3 h-100 d-flex align-items-center gap-2">
+  <div class="container-fluid px-3 px-lg-4 h-100 d-flex align-items-center gap-2">
     <button class="btn btn-link nav-link p-2 d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebar" aria-controls="sidebar" aria-label="Open menu">{{ ico('menu') }}</button>
-    <a class="brand" href="{{ url_for('admin.dashboard') if current_user.is_superadmin else url_for('ws.home') }}"><span class="mark">{{ tn[0]|upper }}</span><span class="t">{{ tn }}</span></a>
+    <a class="brand d-lg-none" href="{{ home }}"><span class="mark">{{ tn[0]|upper }}</span><span class="t">{{ tn }}</span></a>
+    <div class="crumb d-none d-lg-block">{{ tn }} <span aria-hidden="true">/</span> <b>{{ sections.get(request.endpoint, '') }}</b></div>
     <div class="ms-auto d-flex align-items-center gap-1">
+      {% if current_user.tenant %}<span class="plan-chip d-none d-md-inline">{{ current_user.tenant.plan_label }} plan</span>{% endif %}
       {{ theme_menu() }}
       <div class="dropdown">
         <button class="btn btn-link nav-link p-1 d-flex align-items-center gap-2" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Account">
-          <span class="mark mark-avatar">{{ current_user.email[0]|upper }}</span>
+          <span class="mark mark-avatar">{{ (current_user.name or current_user.email)[0]|upper }}</span>
         </button>
-        <ul class="dropdown-menu dropdown-menu-end shadow-sm menu-wide">
-          <li><div class="dropdown-item-text small text-body-secondary text-truncate menu-email">{{ current_user.email }}</div></li>
+        <ul class="dropdown-menu dropdown-menu-end menu-wide">
+          <li><div class="dropdown-item-text"><div class="acct-name text-truncate">{{ current_user.name }}</div><div class="small text-body-secondary text-truncate menu-email">{{ current_user.email }}</div></div></li>
           <li><hr class="dropdown-divider"></li>
           <li><a class="dropdown-item d-flex align-items-center gap-2" href="{{ url_for('auth.change_password') }}">{{ ico('lock') }} Change password</a></li>
           <li><form method="post" action="{{ url_for('auth.logout') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="dropdown-item d-flex align-items-center gap-2">{{ ico('out') }} Sign out</button></form></li>
@@ -31,31 +42,35 @@
 
 <aside class="sidebar offcanvas-lg offcanvas-start" id="sidebar" tabindex="-1" aria-label="Main navigation">
   <div class="offcanvas-header border-bottom">
-    <div class="side-brand d-flex align-items-center gap-2 fw-bold flex-grow-1 min-w-0"><span class="mark">{{ tn[0]|upper }}</span><span class="side-brand-t">{{ tn }}</span></div>
+    <div class="side-brand-t d-flex align-items-center gap-2 fw-semibold flex-grow-1 min-w-0"><span class="mark">{{ tn[0]|upper }}</span><span>{{ tn }}</span></div>
     <button type="button" class="btn-close flex-shrink-0" data-bs-dismiss="offcanvas" data-bs-target="#sidebar" aria-label="Close"></button>
   </div>
   <div class="offcanvas-body d-flex flex-column p-0">
-    <nav class="nav flex-column side-nav gap-1">
+    <a class="side-brand d-none d-lg-flex" href="{{ home }}"><span class="mark">{{ tn[0]|upper }}</span><span class="t">{{ tn }}<span class="sub">{{ 'System administration' if current_user.is_superadmin else 'TylonERP workspace' }}</span></span></a>
+    <nav class="nav flex-column side-nav">
     {% if current_user.is_superadmin %}
       {{ item(['admin.dashboard'], url_for('admin.dashboard'), 'grid', 'Overview') }}
       {{ item(['admin.tenants','admin.tenant_new','admin.tenant_detail','admin.tenant_plan','admin.tenant_toggle','admin.tenant_reset'], url_for('admin.tenants'), 'building', 'Tenants') }}
       {{ item(['admin.system'], url_for('admin.system'), 'cog', 'System') }}
     {% else %}
+      <div class="side-group">Sell</div>
       {{ item(['ws.home'], url_for('ws.home'), 'grid', 'Dashboard') }}
       {{ item(['ws.quick_sell'], url_for('ws.quick_sell'), 'bolt', 'Quick sell') }}
       {{ item(['ws.products'], url_for('ws.products'), 'box', 'Stock') }}
-      {{ item(['ws.clients'], url_for('ws.clients'), 'users', 'Clients') }}
+      <div class="side-group">Records</div>
       {{ item(['ws.sales','ws.receipt'], url_for('ws.sales'), 'receipt', 'Sales') }}
+      {{ item(['ws.clients'], url_for('ws.clients'), 'users', 'Clients') }}
       {{ item(['ws.debtors'], url_for('ws.debtors'), 'wallet', 'Debtors') }}
       {% if current_user.role == 'admin' %}
-      {{ item(['ws.members'], url_for('ws.members'), 'team', 'Members') }}
-      {{ item(['ws.payments'], url_for('ws.payments'), 'wallet', 'Payments') }}
+      <div class="side-group">Settings</div>
+      {{ item(['ws.members','ws.member_reset'], url_for('ws.members'), 'team', 'Members') }}
+      {{ item(['ws.payments'], url_for('ws.payments'), 'card', 'Payments') }}
       {{ item(['ws.branding'], url_for('ws.branding'), 'image', 'Login page') }}
       {% endif %}
     {% endif %}
     </nav>
     <div class="side-foot mt-auto">
-      <div class="who" title="{{ current_user.email }}">{{ current_user.email }}</div>
+      <div class="who" title="{{ current_user.email }}"><span class="mark mark-avatar">{{ (current_user.name or current_user.email)[0]|upper }}</span><div class="min-w-0"><div class="nm">{{ current_user.name }}</div><div class="em">{{ current_user.email }}</div></div></div>
       <nav class="nav flex-column gap-1">
         {{ item(['auth.change_password'], url_for('auth.change_password'), 'lock', 'Password') }}
         <form method="post" action="{{ url_for('auth.logout') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="nav-link">{{ ico('out') }}<span>Sign out</span></button></form>
@@ -64,8 +79,8 @@
   </div>
 </aside>
 
-<main class="main"><div class="wrap">
-  {% with m = get_flashed_messages(with_categories=true) %}{% for c, t in m %}<div class="alert alert-{{ 'success' if c=='ok' else 'danger' }} alert-dismissible fade show" role="alert">{{ t }}<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button></div>{% endfor %}{% endwith %}
+<main class="main" id="content" tabindex="-1"><div class="wrap">
+  {% with m = get_flashed_messages(with_categories=true) %}{% for c, t in m %}<div class="alert alert-{{ 'success' if c=='ok' else 'danger' }} alert-dismissible fade show" role="{{ 'status' if c=='ok' else 'alert' }}"><span>{{ t }}</span><button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button></div>{% endfor %}{% endwith %}
   {% block content %}{% endblock %}
 </div></main>
 
@@ -76,7 +91,7 @@
   {{ tab(['admin.system'], url_for('admin.system'), 'cog', 'System') }}
 {% else %}
   {{ tab(['ws.home'], url_for('ws.home'), 'grid', 'Home') }}
-  {{ tab(['ws.quick_sell'], url_for('ws.quick_sell'), 'bolt', 'Quick sell') }}
+  {{ tab(['ws.quick_sell'], url_for('ws.quick_sell'), 'bolt', 'Sell') }}
   {{ tab(['ws.products'], url_for('ws.products'), 'box', 'Stock') }}
   {{ tab(['ws.sales','ws.receipt'], url_for('ws.sales'), 'receipt', 'Sales') }}
 {% endif %}

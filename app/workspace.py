@@ -205,18 +205,34 @@ def login_image(slug):
 @tenant_user
 def home():
     t = current_user.tenant
-    since = utcnow() - timedelta(days=30)
+    now = utcnow()
+    since = now - timedelta(days=30)
     sales = Sale.query.filter_by(tenant_id=tid()).all()
-    recent = [s for s in sales if s.created_at >= since and s.payment_status != "refunded"]
+    counted = [s for s in sales if s.payment_status != "refunded"]
+    recent = [s for s in counted if s.created_at >= since]
     low = Product.query.filter(Product.tenant_id == tid(), Product.stock <= Product.reorder_level).order_by(Product.stock).limit(6).all()
     stats = {
         "revenue": sum((s.total for s in recent), Decimal(0)),
         "owed": sum((s.balance for s in sales), Decimal(0)),
+        "debtors": len({s.client_id for s in sales if s.balance > 0 and s.client_id}),
         "products": Product.query.filter_by(tenant_id=tid()).count(),
         "clients": Client.query.filter_by(tenant_id=tid()).count(),
+        "low": Product.query.filter(Product.tenant_id == tid(), Product.stock <= Product.reorder_level).count(),
     }
+    # Takings per day for the last 14 days (UTC days), oldest first, for the bar chart.
+    today = now.date()
+    days = [today - timedelta(days=i) for i in range(13, -1, -1)]
+    by_day = dict.fromkeys(days, Decimal(0))
+    for s in counted:
+        d = s.created_at.date()
+        if d in by_day:
+            by_day[d] += s.total
+    takings = [{"day": d, "total": by_day[d]} for d in days]
+    stats["today"] = by_day[today]
+    stats["today_count"] = sum(1 for s in counted if s.created_at.date() == today)
     latest = Sale.query.filter_by(tenant_id=tid()).order_by(Sale.created_at.desc()).limit(6).all()
-    return render_template("ws/home.html", tenant=t, stats=stats, low=low, latest=latest)
+    return render_template("ws/home.html", tenant=t, stats=stats, low=low, latest=latest, takings=takings,
+                           peak=max((x["total"] for x in takings), default=Decimal(0)))
 
 
 # ------------------------------------------------------------ products
@@ -856,7 +872,7 @@ def member_reset(uid):
 
 # ------------------------------------------------------------ branding
 
-DEFAULT_COLOURS = {"accent": "#0a66c2", "background": "#f4f2ee", "panel": "#ffffff"}
+DEFAULT_COLOURS = {"accent": "#0f5c4a", "background": "#eef1ef", "panel": "#ffffff"}
 
 
 @ws_bp.route("/branding", methods=["GET", "POST"])

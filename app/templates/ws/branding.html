@@ -1,6 +1,7 @@
 {% extends "shell.html" %}
+{% block title %}Login page · {{ tenant.name }}{% endblock %}
 {% block content %}
-<div class="page-head"><h1>Login page</h1><a class="btn btn-sm btn-outline-primary" target="_blank" href="{{ url_for('auth.login', slug=tenant.slug) }}">Preview</a></div>
+<div class="page-head"><div><h1>Login page</h1><p class="sub">How your sign-in page looks to your team, and the accent colour used across your workspace.</p></div><div class="actions"><a class="btn btn-outline-primary" target="_blank" rel="noopener" href="{{ url_for('auth.login', slug=tenant.slug) }}">Preview sign-in page</a></div></div>
 <form method="post" enctype="multipart/form-data" class="card card-body mw-form">
 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 <p class="text-body-secondary">Your team signs in at <b class="text-break">{{ url_for('auth.login', slug=tenant.slug, _external=True) }}</b></p>
@@ -15,8 +16,8 @@
 <h2 class="h5 mt-3">Colours</h2>
 <p class="text-body-secondary small">The accent recolours buttons and links across your workspace and sign-in page. Background and panels style your sign-in page. Light and dark mode switch the rest of the app.</p>
 <div class="row g-3 mb-3">
-<div class="col-4"><label class="form-label">Accent</label><input class="form-control form-control-color w-100" type="color" name="accent" value="{{ b.accent if b and b.accent else '#0a66c2' }}"></div>
-<div class="col-4"><label class="form-label">Background</label><input class="form-control form-control-color w-100" type="color" name="background" value="{{ b.background if b and b.background else '#f4f2ee' }}"></div>
+<div class="col-4"><label class="form-label">Accent</label><input class="form-control form-control-color w-100" type="color" name="accent" value="{{ b.accent if b and b.accent else '#0f5c4a' }}"></div>
+<div class="col-4"><label class="form-label">Background</label><input class="form-control form-control-color w-100" type="color" name="background" value="{{ b.background if b and b.background else '#eef1ef' }}"></div>
 <div class="col-4"><label class="form-label">Panels</label><input class="form-control form-control-color w-100" type="color" name="panel" value="{{ b.panel if b and b.panel else '#ffffff' }}"></div></div>
 <div class="form-check mb-3"><input class="form-check-input" type="checkbox" name="reset_colours" id="rc"><label class="form-check-label fw-normal" for="rc">Reset to the default colours</label></div>
 <button class="btn btn-primary align-self-start">Save</button></form>
