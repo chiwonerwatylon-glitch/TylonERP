@@ -50,3 +50,12 @@ refuses to start with the built-in dev `SECRET_KEY`, and logs warnings for a sho
 failed sign-in shows the same message. Responses carry CSP, frame, nosniff, referrer and permissions headers,
 and HSTS over HTTPS; pages are sent `Cache-Control: no-store`. The rate limiter counts in memory per gunicorn
 worker; set `RATELIMIT_STORAGE_URI` to a Redis URL to share counts across workers.
+
+## Mobile money payments
+
+On **Quick sell** and **Sales**, choose a payment method:
+
+- **EcoCash** charges the customer's wallet through the [EcoCash Online Payments API](https://developers.ecocash.co.zw/docs/online-payments). The customer approves with their PIN. The sale is kept only if the charge succeeds; if EcoCash does not answer, it stays *Pending* and **Check payment** looks it up. Admins can **Refund** a paid EcoCash sale (stock is returned).
+- **OneMoney (NetOne)** records the customer's number and the NetOne transaction code. There is no API call: the cashier confirms the payment on the phone first.
+
+Set `ECOCASH_USERNAME`, `ECOCASH_PASSWORD`, `ECOCASH_MERCHANT_CODE`, `ECOCASH_MERCHANT_PIN` and `ECOCASH_MERCHANT_NUMBER` to enable EcoCash (see `.env.example`). The default URL is the sandbox; set `ECOCASH_BASE_URL` to the production URL EcoCash sends you at go-live.

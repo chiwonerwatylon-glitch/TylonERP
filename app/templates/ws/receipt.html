@@ -38,6 +38,8 @@
   <hr>
   <div class="r t"><span>TOTAL</span><span>{{ '%.2f'|format(s.total) }}</span></div>
   <div class="r"><span>Paid</span><span>{{ '%.2f'|format(s.paid) }}</span></div>
+  {% if s.payment_method in ('ecocash','onemoney') %}<div class="r"><span>Method</span><span>{{ s.method_label }}</span></div>
+  {% if s.payment_ref %}<div class="r m"><span>Ref</span><span>{{ s.payment_ref }}</span></div>{% endif %}{% endif %}
   {% if s.balance > 0 %}<div class="r t"><span>BALANCE DUE</span><span>{{ '%.2f'|format(s.balance) }}</span></div>{% endif %}
   <div class="c"><span class="stamp">{{ s.kind|upper }} SALE</span></div>
   <hr>
