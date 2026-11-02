@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en" data-bs-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>TylonERP offline</title>
+<script src="static/theme.js"></script>
+<link rel="stylesheet" href="static/vendor/bootstrap.min.css">
+<link rel="stylesheet" href="static/style.css">
+<link rel="stylesheet" href="offline.css">
+</head>
+<body class="off">
+<header class="appbar off-bar">
+  <div class="h-100 d-flex align-items-center gap-2 px-3">
+    <span class="mark" id="markletter">T</span>
+    <div class="min-w-0 flex-grow-1">
+      <div class="off-name" id="tname">TylonERP</div>
+      <div class="off-status" id="status" aria-live="polite">Offline</div>
+    </div>
+    <button class="btn btn-sm btn-outline-primary" type="button" id="syncbtn">Sync</button>
+  </div>
+</header>
+
+<div class="off-banner hidden" id="banner"><span id="bannertext"></span><button class="btn btn-sm btn-primary" type="button" id="bannerbtn">Open full app</button></div>
+
+<main class="off-main">
+
+  <!-- SELL -->
+  <section class="off-page" id="pg-sell" data-title="Sell">
+    <div class="off-head"><h1>Sell</h1><p class="sub">Works without a connection. Sales upload by themselves later.</p></div>
+    <div class="card card-body mb-3">
+      <label class="form-label" for="sq">Find a product</label>
+      <div class="d-flex gap-2">
+        <input class="form-control" id="sq" type="search" placeholder="Name or barcode" autocomplete="off">
+        <button class="btn btn-outline-primary" type="button" id="sscan" aria-label="Scan a barcode">Scan</button>
+      </div>
+      <div class="cam mt-3 hidden" id="scam"><video id="sv" muted playsinline></video><div class="reticle"></div><div class="hint" id="shint">Starting camera…</div></div>
+    </div>
+    <div id="slist" class="pick-list"></div>
+  </section>
+
+  <!-- STOCK -->
+  <section class="off-page hidden" id="pg-stock" data-title="Stock">
+    <div class="off-head"><h1>Stock</h1><p class="sub">Count stock in by barcode, or add a product by hand.</p></div>
+    <div class="card card-body mb-3">
+      <div class="row g-2 align-items-end">
+        <div class="col-5"><label class="form-label" for="kqty">Units per scan</label><input class="form-control" id="kqty" inputmode="numeric" value="1"></div>
+        <div class="col-7 d-grid"><button class="btn btn-primary" type="button" id="kscan">Scan barcodes</button></div>
+      </div>
+      <div class="cam mt-3 hidden" id="kcam"><video id="kv" muted playsinline></video><div class="reticle"></div><div class="hint" id="khint">Starting camera…</div></div>
+      <label class="form-label mt-3" for="kcode">Or type a barcode</label>
+      <div class="input-group"><input class="form-control" id="kcode" inputmode="numeric" autocomplete="off"><button class="btn btn-outline-primary" type="button" id="kadd">Add</button></div>
+      <div id="knew" class="hidden card card-body bg-body-tertiary shadow-none mt-3">
+        <p class="mb-2"><b>New barcode <span class="font-monospace" id="kcodeshow"></span></b>. Which product is it?</p>
+        <div id="klinkwrap">
+          <label class="form-label" for="klink">A product already on this phone</label>
+          <div class="d-flex gap-2 mb-3"><select class="form-select" id="klink"></select><button class="btn btn-primary" type="button" id="klinkbtn">Link</button></div>
+          <div class="or-rule"><span>or register a new product</span></div>
+        </div>
+        <div class="row g-2 mb-3"><div class="col-7"><label class="form-label" for="kname">Product name</label><input class="form-control" id="kname" maxlength="150"></div><div class="col-5"><label class="form-label" for="kprice">Price</label><input class="form-control" id="kprice" inputmode="decimal"></div></div>
+        <div class="d-flex gap-2"><button class="btn btn-primary" type="button" id="ksave">Register and count</button><button class="btn btn-outline-secondary" type="button" id="kskip">Skip</button></div>
+      </div>
+      <div id="klog" class="mt-3" aria-live="polite"></div>
+    </div>
+
+    <details class="card card-body mb-3 add-box">
+      <summary>Add a product by hand</summary>
+      <form id="mform" class="mt-3" novalidate>
+        <div class="mb-2"><label class="form-label" for="mname">Product name</label><input class="form-control" id="mname" maxlength="150"></div>
+        <div class="row g-2 mb-2"><div class="col-6"><label class="form-label" for="mprice">Price</label><input class="form-control" id="mprice" inputmode="decimal"></div><div class="col-6"><label class="form-label" for="mqty">How many</label><input class="form-control" id="mqty" inputmode="numeric" value="1"></div></div>
+        <div class="row g-2 mb-3"><div class="col-6"><label class="form-label" for="mbar">Barcode <span class="text-body-secondary fw-normal">(optional)</span></label><input class="form-control" id="mbar" inputmode="numeric"></div><div class="col-6"><label class="form-label" for="msku">SKU <span class="text-body-secondary fw-normal">(optional)</span></label><input class="form-control" id="msku"></div></div>
+        <button class="btn btn-primary" type="submit">Save product</button>
+      </form>
+    </details>
+
+    <div class="card">
+      <div class="card-head"><h2>Products <span class="text-body-secondary fw-normal" id="pcount"></span></h2></div>
+      <div class="px-3 pt-3"><input class="form-control form-control-sm" type="search" id="pfilter" placeholder="Find a product"></div>
+      <div id="plist"></div>
+    </div>
+  </section>
+
+  <!-- CLIENTS -->
+  <section class="off-page hidden" id="pg-clients" data-title="Clients">
+    <div class="off-head"><h1>Clients</h1><p class="sub">Needed for credit and part-paid sales.</p></div>
+    <form class="card card-body mb-3" id="cform" novalidate>
+      <div class="mb-2"><label class="form-label" for="cname">Name</label><input class="form-control" id="cname" maxlength="150"></div>
+      <div class="mb-3"><label class="form-label" for="cphone">Phone <span class="text-body-secondary fw-normal">(optional)</span></label><input class="form-control" id="cphone" type="tel" inputmode="tel"></div>
+      <div><button class="btn btn-primary" type="submit">Add client</button></div>
+    </form>
+    <div class="card"><div class="card-head"><h2>All clients <span class="text-body-secondary fw-normal" id="ccount"></span></h2></div><div id="clist"></div></div>
+  </section>
+
+  <!-- DEBTORS -->
+  <section class="off-page hidden" id="pg-debts" data-title="Debtors">
+    <div class="off-head"><h1>Debtors</h1><p class="sub">Record a payment as it comes in. It uploads with the rest.</p></div>
+    <div class="card stat mb-3"><div class="k">Total owed</div><div class="v" id="dtotal">0.00</div></div>
+    <div class="card"><div id="dlist"></div></div>
+  </section>
+
+  <!-- CHANGES -->
+  <section class="off-page hidden" id="pg-changes" data-title="Changes">
+    <div class="off-head"><h1>Changes on this phone</h1><p class="sub">Everything recorded here, and whether it has reached the server.</p></div>
+    <div class="card card-body mb-3" id="syncbox"></div>
+    <div class="card mb-3"><div id="olist"></div></div>
+    <div class="card card-body">
+      <h2 class="h6 mb-1">This phone</h2>
+      <p class="small text-body-secondary mb-3" id="whoami"></p>
+      <div class="d-flex gap-2 flex-wrap"><button class="btn btn-outline-primary btn-sm" type="button" id="goonline">Open full app</button><button class="btn btn-outline-danger btn-sm" type="button" id="signout">Sign out of this phone</button></div>
+    </div>
+  </section>
+</main>
+
+<!-- the sale sheet slides over the Sell page -->
+<div class="sheet-back hidden" id="sheetback"></div>
+<section class="sale-sheet hidden" id="sale" role="dialog" aria-modal="true" aria-labelledby="salename">
+  <div class="d-flex align-items-start justify-content-between gap-2 mb-2">
+    <div class="min-w-0"><h2 class="h5 mb-0" id="salename"></h2><div class="small text-body-secondary" id="saleinfo"></div></div>
+    <button class="btn-close" type="button" id="saleclose" aria-label="Close"></button>
+  </div>
+  <div class="row g-2 mb-2">
+    <div class="col-5"><label class="form-label" for="qty">How many</label><input class="form-control form-control-lg" id="qty" inputmode="numeric" value="1"></div>
+    <div class="col-7"><label class="form-label">Total</label><div class="count" id="total">0.00</div></div>
+  </div>
+  <div class="mb-2"><label class="form-label" for="client">Client <span class="text-body-secondary fw-normal">(needed for credit)</span></label><select class="form-select" id="client"></select></div>
+  <div class="row g-2 mb-2">
+    <div class="col-6"><label class="form-label" for="paid">Amount paid</label><input class="form-control" id="paid" inputmode="decimal" placeholder="Full amount"></div>
+    <div class="col-6"><label class="form-label" for="method">Paid with</label><select class="form-select" id="method"><option value="cash">Cash</option><option value="onemoney">OneMoney</option></select></div>
+  </div>
+  <div class="row g-2 mb-2 hidden" id="omwrap">
+    <div class="col-6"><label class="form-label" for="ophone">Customer number</label><input class="form-control" id="ophone" type="tel" inputmode="tel" placeholder="0711234567"></div>
+    <div class="col-6"><label class="form-label" for="oref">Transaction code</label><input class="form-control" id="oref" maxlength="60"></div>
+  </div>
+  <p class="small text-body-secondary mb-3">EcoCash needs a connection; use the full app for it.</p>
+  <div id="salemsg"></div>
+  <button class="btn btn-primary btn-lg w-100" type="button" id="sellbtn">Sell</button>
+</section>
+
+<!-- receipt after a sale -->
+<section class="sale-sheet hidden" id="done" role="dialog" aria-modal="true" aria-labelledby="donetitle">
+  <h2 class="h5" id="donetitle">Sale saved on this phone</h2>
+  <p class="text-body-secondary small mb-3">It uploads by itself when there is a connection.</p>
+  <div class="rc-mini" id="receipt"></div>
+  <div class="d-flex gap-2 mt-3"><button class="btn btn-outline-primary flex-fill" type="button" id="printbtn">Print</button><button class="btn btn-primary flex-fill" type="button" id="donebtn">Next sale</button></div>
+</section>
+
+<nav class="tabbar off-tabs" aria-label="Sections">
+  <button type="button" data-tab="sell" class="active"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg><span>Sell</span></button>
+  <button type="button" data-tab="stock"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21 8-9-5-9 5v8l9 5 9-5z"/><path d="m3 8 9 5 9-5M12 13v8"/></svg><span>Stock</span></button>
+  <button type="button" data-tab="clients"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.4 3.3-5.5 6.5-5.5s5.9 2.1 6.5 5.5"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14.8c1.8.8 3 2.6 3.5 5.2"/></svg><span>Clients</span></button>
+  <button type="button" data-tab="debts"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h13v4"/><path d="M3 7v11a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1H5a2 2 0 0 1-2-1z"/><circle cx="16.5" cy="14" r="1.2"/></svg><span>Debtors</span></button>
+  <button type="button" data-tab="changes"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 0 1 13.7-5.6L20 8.5M20 4v4.5h-4.5"/><path d="M20 12a8 8 0 0 1-13.7 5.6L4 15.5M4 20v-4.5h4.5"/></svg><span>Changes</span><b class="tab-badge hidden" id="badge">0</b></button>
+</nav>
+
+<script src="static/capture.js"></script>
+<script src="offline.js"></script>
+</body>
+</html>

@@ -6,6 +6,12 @@
 (function () {
   'use strict';
 
+  // Inside the Android app the web view cannot print by itself; the app's bridge does it.
+  if (window.TylonAndroid && window.TylonAndroid.print) {
+    window.print = function () { window.TylonAndroid.print(document.title || 'TylonERP'); };
+    document.documentElement.classList.add('in-app');
+  }
+
   function lock(form, submitter) {
     // After the browser has collected the form's values, so a named submit button still sends its value.
     setTimeout(function () { lockNow(form, submitter); }, 0);

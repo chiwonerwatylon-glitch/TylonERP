@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 108dp adaptive icon foreground: the T mark with a maize bar, inside the 66dp safe zone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#FFFFFF" android:pathData="M37,36h34v9h-12.5v31h-9v-31h-12.5z" />
+    <path android:fillColor="#E8B230" android:pathData="M63,70h14a3,3 0,0 1,0 6h-14a3,3 0,0 1,0 -6z" />
+</vector>

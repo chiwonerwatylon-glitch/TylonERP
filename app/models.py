@@ -227,3 +227,20 @@ class Sale(db.Model):
         if self.paid >= self.total:
             return "Cash"
         return "Credit" if self.paid <= 0 else "Part-paid"
+
+
+class SyncOp(db.Model):
+    """One change made on a phone (possibly offline) and uploaded later.
+
+    `op_id` is created on the phone. A retried upload finds the stored result instead of recording the change twice.
+    """
+    __tablename__ = "sync_ops"
+    id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(db.Integer, db.ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True)
+    op_id = db.Column(db.String(40), nullable=False)
+    kind = db.Column(db.String(30), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"))
+    result = db.Column(db.Text, nullable=False)  # JSON returned to the phone
+    created_at = db.Column(db.DateTime, nullable=False, default=utcnow)
+
+    __table_args__ = (db.UniqueConstraint("tenant_id", "op_id", name="uq_sync_op"),)

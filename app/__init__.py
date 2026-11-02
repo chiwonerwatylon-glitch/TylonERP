@@ -11,7 +11,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from .config import load_settings
 from .security import init_security, limiter
 
-VERSION = "1.9.0"
+VERSION = "1.10.0"
 
 db = SQLAlchemy()
 login_manager = LoginManager()
@@ -99,6 +99,7 @@ def create_app(config=None):
         g.slug = _slug_from_path()
 
     from . import models
+    from .api import api_bp, mobile_bp
     from .routes import admin_bp, auth_bp, main_bp
     from .workspace import public_bp, ws_bp
 
@@ -107,6 +108,10 @@ def create_app(config=None):
     app.register_blueprint(main_bp)
     app.register_blueprint(ws_bp)
     app.register_blueprint(public_bp)
+    app.register_blueprint(api_bp)
+    app.register_blueprint(mobile_bp)
+    csrf.exempt(api_bp)  # the phone authenticates with a bearer token, not a browser session
+    csrf.exempt(mobile_bp)
     app.config["MAX_CONTENT_LENGTH"] = 4 * 1024 * 1024
 
     @app.context_processor

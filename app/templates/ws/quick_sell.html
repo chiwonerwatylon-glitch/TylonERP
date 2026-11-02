@@ -116,6 +116,8 @@
   };
   // print through a hidden frame so the camera page stays open for the next sale
   function printReceipt(url) {
+    // Inside the Android app, the phone prints the receipt page itself.
+    if (window.TylonAndroid && TylonAndroid.printUrl) { TylonAndroid.printUrl(new URL(url.replace('print=1', 'print=0'), location.href).href); return; }
     const old = document.getElementById('rframe'); if (old) old.remove();
     const f = document.createElement('iframe'); f.id = 'rframe';
     f.style.cssText = 'position:fixed;width:0;height:0;border:0;opacity:0';

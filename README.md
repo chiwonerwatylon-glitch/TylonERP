@@ -96,6 +96,20 @@ A barcode never creates a second product, however it reaches the app (`app/barco
 - **Possible duplicates** on the Stock page lists products that share a name or barcode. An admin can merge them:
   stock, sales and stock history move into the product kept.
 
+## Android app
+
+`android/` is an Android Studio project (Android 7.0 and later). Online it shows this web app; offline it sells,
+counts stock and records payments on the phone, then uploads them through the phone API in `app/api.py`:
+
+| Endpoint | Purpose |
+|---|---|
+| `POST /api/v1/login` | Business, email and password give a token (90 days; changing the password signs phones out) |
+| `GET /api/v1/catalog` | Products, clients and open debts for the phone's offline copy |
+| `POST /api/v1/sync` | Changes made on the phone. Each has an `op_id`; its result is stored (`sync_ops`), so a retried upload never records twice |
+| `POST /t/<slug>/mobile-session` | Signs the app's web view in with its token |
+
+See `android/README.md` to build the APK.
+
 ## Mobile money payments
 
 On **Quick sell** and **Sales**, choose a payment method:
