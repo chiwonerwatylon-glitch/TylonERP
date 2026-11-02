@@ -1,36 +1,64 @@
 {% extends "base.html" %}
-{% from "_ui.html" import theme_menu %}
-{% block title %}Sign in · {{ tenant.name if tenant else "TylonERP" }}{% endblock %}
+{% from "_ui.html" import ico, theme_menu %}
+{% block title %}Sign in · {{ tenant.name if tenant else "TylonERP console" }}{% endblock %}
 {% block body %}
 {% set b = tenant.branding if tenant else None %}
 {% set ac = auth_colors %}
-<div class="auth">
-  <section class="auth-hero"
-    style="{% if ac %}--hero-a:{{ ac.bg }};--hero-b:{{ ac.hero_b }};color:{{ ac.hero_text }};{% endif %}{% if b and b.image %}background-image:linear-gradient(160deg,rgba(8,12,26,.72),rgba(8,12,26,.35)),url('{{ url_for('tenant_public.login_image', slug=tenant.slug) }}?v={{ b.updated_at.timestamp()|int }}');background-size:cover;background-position:center;color:#fff{% endif %}">
-    <div class="brand">{% if b and b.logo %}<img class="logo" src="{{ url_for('tenant_public.login_logo', slug=tenant.slug) }}?v={{ b.updated_at.timestamp()|int }}" alt="">{% else %}<span class="mark">{{ (tenant.name[0] if tenant else "T")|upper }}</span>{% endif %}<span>{{ tenant.name if tenant else "TylonERP" }}</span></div>
-    <div class="hero-copy">
-      {% if b and b.headline %}<h1>{{ b.headline }}</h1>{% elif tenant %}<h1>Welcome to {{ tenant.name }}</h1>{% else %}<h1>Run every business from one place.</h1>{% endif %}
-      <p>{{ b.tagline if b and b.tagline else ("Sign in to your team workspace." if tenant else "Stock, sales and debtors for each of your organisations, managed together with calm and clarity.") }}</p>
+{% set ver = b.updated_at.timestamp()|int if b and b.updated_at else 0 %}
+<div class="signin {{ 'signin-console' if not tenant }}"{% if ac %} style="--canvas:{{ ac.bg }};--page-bg:{{ ac.bg }}"{% endif %}>
+  <header class="signin-top">
+    <div class="signin-brand">
+      {% if b and b.logo %}<img class="logo" src="{{ url_for('tenant_public.login_logo', slug=tenant.slug) }}?v={{ ver }}" alt="">
+      {% else %}<span class="mark">{{ (tenant.name[0] if tenant else "T")|upper }}</span>{% endif %}
+      <span>{{ tenant.name if tenant else "TylonERP" }}</span>
     </div>
-    <div class="foot">{% if tenant %}Powered by TylonERP{% else %}&copy; {{ now.year }} TylonERP{% endif %} &middot; v{{ app_version }}</div>
-  </section>
-  <section class="auth-form"{% if ac %} data-bs-theme="{{ ac.mode }}" style="--bs-body-bg:{{ ac.panel }};--bs-body-bg-rgb:{{ ac.panel[1:3]|int(base=16) }},{{ ac.panel[3:5]|int(base=16) }},{{ ac.panel[5:7]|int(base=16) }};--bs-tertiary-bg:{{ ac.bg }};--bs-body-color:{{ ac.text }};--bs-secondary-color:{{ ac.muted }};--bs-border-color:{{ ac.line }}"{% endif %}>
-    <div class="theme-corner">{{ theme_menu() }}</div>
-    <form class="auth-card" method="post" autocomplete="on">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      {% if tenant %}<div class="d-flex align-items-center gap-3 mb-4">{% if b and b.logo %}<img class="logo logo-md" src="{{ url_for('tenant_public.login_logo', slug=tenant.slug) }}?v={{ b.updated_at.timestamp()|int }}" alt="">{% else %}<span class="mark mark-lg">{{ tenant.name[0]|upper }}</span>{% endif %}<span class="fs-5 fw-semibold">{{ tenant.name }}</span></div>
-      <h2 class="mb-1">Sign in</h2>
-      <p class="text-body-secondary mb-4">to the {{ tenant.name }} workspace</p>{% else %}<h2 class="mb-1">Welcome back</h2>
-      <p class="text-body-secondary mb-4">Sign in to continue to your workspace.</p>{% endif %}
-      {% with m = get_flashed_messages(with_categories=true) %}{% for c, t in m %}<div class="alert alert-{{ 'success' if c=='ok' else 'danger' }}" role="alert">{{ t }}</div>{% endfor %}{% endwith %}
-      <div class="mb-3"><label class="form-label" for="email">Email</label>
-        <input class="form-control form-control-lg" id="email" name="email" type="email" required autofocus autocomplete="username" placeholder="you@company.com" value="{{ request.form.email }}"></div>
-      <div class="mb-3"><label class="form-label" for="password">Password</label>
-        <div class="input-group input-group-lg"><input class="form-control" id="password" name="password" type="password" required autocomplete="current-password" placeholder="••••••••">
-        <button class="btn btn-outline-secondary pw-toggle" type="button" aria-label="Show password" onclick="var i=document.getElementById('password');i.type=i.type==='password'?'text':'password';this.textContent=i.type==='password'?'Show':'Hide'">Show</button></div></div>
-      <div class="form-check mb-4"><input class="form-check-input" type="checkbox" name="remember" id="remember"><label class="form-check-label" for="remember">Keep me signed in</label></div>
-      <button class="btn btn-primary btn-lg w-100" type="submit">Sign in</button>
-    </form>
-  </section>
+    {{ theme_menu() }}
+  </header>
+
+  <main class="signin-main">
+    <div class="signin-card"{% if ac %} data-bs-theme="{{ ac.mode }}" style="--surface:{{ ac.panel }};--bs-body-bg:{{ ac.panel }};--bs-body-bg-rgb:{{ ac.panel[1:3]|int(base=16) }},{{ ac.panel[3:5]|int(base=16) }},{{ ac.panel[5:7]|int(base=16) }};--ink:{{ ac.text }};--bs-body-color:{{ ac.text }};--muted:{{ ac.muted }};--bs-secondary-color:{{ ac.muted }};--line:{{ ac.line }};--bs-border-color:{{ ac.line }};--line-strong:{{ ac.line }}"{% endif %}>
+      <section class="signin-side{{ ' has-image' if b and b.image }}"{% if b and b.image %} style="background-image:linear-gradient(180deg,rgba(6,14,11,.15),rgba(6,14,11,.78)),url('{{ url_for('tenant_public.login_image', slug=tenant.slug) }}?v={{ ver }}')"{% endif %} aria-hidden="{{ 'false' if tenant else 'true' }}">
+        {% if tenant %}
+          <h1>{{ b.headline if b and b.headline else 'Welcome to ' ~ tenant.name }}</h1>
+          <p>{{ b.tagline if b and b.tagline else 'Sell, count stock and keep track of who owes what, from the counter or your phone.' }}</p>
+        {% else %}
+          <h1>The TylonERP console</h1>
+          <p>Register businesses, change their plans and reset owner access. Business staff sign in on their own business page.</p>
+        {% endif %}
+        <div class="signin-tag">{% if tenant %}{{ ico('team') }} Team sign-in{% else %}{{ ico('cog') }} System administration{% endif %}</div>
+      </section>
+
+      <form class="signin-form" method="post" autocomplete="on">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <h2>{{ 'Sign in' if tenant else 'Administrator sign in' }}</h2>
+        <p class="lead-in">{{ 'Use the email and password your admin gave you.' if tenant else 'For the people who run this TylonERP installation.' }}</p>
+        {% with m = get_flashed_messages(with_categories=true) %}{% for c, t in m %}<div class="alert alert-{{ 'success' if c=='ok' else 'danger' }}" role="alert"><span>{{ t }}</span></div>{% endfor %}{% endwith %}
+        <div class="mb-3">
+          <label class="form-label" for="email">Email</label>
+          <input class="form-control form-control-lg" id="email" name="email" type="email" required autofocus autocomplete="username" inputmode="email" placeholder="you@business.co.zw" value="{{ request.form.email }}">
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="password">Password</label>
+          <div class="pw-field">
+            <input class="form-control form-control-lg" id="password" name="password" type="password" required autocomplete="current-password">
+            <button class="pw-toggle" type="button" id="pwt" aria-label="Show password" aria-pressed="false"><span class="show">{{ ico('eye') }}</span><span class="hide">{{ ico('eye-off') }}</span></button>
+          </div>
+        </div>
+        <div class="d-flex align-items-center justify-content-between gap-2 mb-4 flex-wrap">
+          <div class="form-check m-0"><input class="form-check-input" type="checkbox" name="remember" id="remember"><label class="form-check-label" for="remember">Keep me signed in</label></div>
+        </div>
+        <button class="btn btn-primary btn-lg w-100" type="submit" id="go">Sign in</button>
+        <p class="signin-help">{% if tenant %}Forgot your password? Ask an admin at {{ tenant.name }} to reset it.{% else %}Forgot the password? Set <code>ADMIN_PASSWORD</code> on the server and restart.{% endif %}</p>
+      </form>
+    </div>
+  </main>
+
+  <footer class="signin-foot">{% if tenant %}{{ tenant.name }} runs on TylonERP {{ app_version }}{% else %}TylonERP {{ app_version }}{% endif %}</footer>
 </div>
+<script>
+(() => {
+  const i = document.getElementById('password'), t = document.getElementById('pwt');
+  t.onclick = () => { const on = i.type === 'password'; i.type = on ? 'text' : 'password'; t.setAttribute('aria-pressed', on); t.setAttribute('aria-label', on ? 'Hide password' : 'Show password'); i.focus(); };
+})();
+</script>
 {% endblock %}

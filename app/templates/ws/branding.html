@@ -1,24 +1,87 @@
 {% extends "shell.html" %}
 {% block title %}Login page · {{ tenant.name }}{% endblock %}
 {% block content %}
-<div class="page-head"><div><h1>Login page</h1><p class="sub">How your sign-in page looks to your team, and the accent colour used across your workspace.</p></div><div class="actions"><a class="btn btn-outline-primary" target="_blank" rel="noopener" href="{{ url_for('auth.login', slug=tenant.slug) }}">Preview sign-in page</a></div></div>
-<form method="post" enctype="multipart/form-data" class="card card-body mw-form">
-<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-<p class="text-body-secondary">Your team signs in at <b class="text-break">{{ url_for('auth.login', slug=tenant.slug, _external=True) }}</b></p>
-{% if b and b.image %}<img src="{{ url_for('tenant_public.login_image', slug=tenant.slug) }}?v={{ b.updated_at.timestamp()|int }}" alt="" class="img-fluid rounded mb-3 w-100 img-banner">{% endif %}
-{% if b and b.logo %}<img src="{{ url_for('tenant_public.login_logo', slug=tenant.slug) }}?v={{ b.updated_at.timestamp()|int }}" alt="" class="mb-2 rounded logo-lg">{% endif %}
-<div class="mb-3"><label class="form-label">Company logo (PNG, JPEG or WebP, max 2 MB)</label><input class="form-control" type="file" name="logo" accept="image/png,image/jpeg,image/webp"></div>
-{% if b and b.logo %}<div class="form-check mb-3"><input class="form-check-input" type="checkbox" name="remove_logo" id="rl"><label class="form-check-label fw-normal" for="rl">Remove logo</label></div>{% endif %}
-<div class="mb-3"><label class="form-label">Background picture (PNG, JPEG or WebP, max 2 MB)</label><input class="form-control" type="file" name="image" accept="image/png,image/jpeg,image/webp"></div>
-{% if b and b.image %}<div class="form-check mb-3"><input class="form-check-input" type="checkbox" name="remove_image" id="ri"><label class="form-check-label fw-normal" for="ri">Remove current picture</label></div>{% endif %}
-<div class="mb-3"><label class="form-label">Headline</label><input class="form-control" type="text" name="headline" maxlength="120" value="{{ b.headline if b and b.headline else '' }}"></div>
-<div class="mb-3"><label class="form-label">Tagline</label><input class="form-control" type="text" name="tagline" maxlength="240" value="{{ b.tagline if b and b.tagline else '' }}"></div>
-<h2 class="h5 mt-3">Colours</h2>
-<p class="text-body-secondary small">The accent recolours buttons and links across your workspace and sign-in page. Background and panels style your sign-in page. Light and dark mode switch the rest of the app.</p>
-<div class="row g-3 mb-3">
-<div class="col-4"><label class="form-label">Accent</label><input class="form-control form-control-color w-100" type="color" name="accent" value="{{ b.accent if b and b.accent else '#0f5c4a' }}"></div>
-<div class="col-4"><label class="form-label">Background</label><input class="form-control form-control-color w-100" type="color" name="background" value="{{ b.background if b and b.background else '#eef1ef' }}"></div>
-<div class="col-4"><label class="form-label">Panels</label><input class="form-control form-control-color w-100" type="color" name="panel" value="{{ b.panel if b and b.panel else '#ffffff' }}"></div></div>
-<div class="form-check mb-3"><input class="form-check-input" type="checkbox" name="reset_colours" id="rc"><label class="form-check-label fw-normal" for="rc">Reset to the default colours</label></div>
-<button class="btn btn-primary align-self-start">Save</button></form>
+{% set ver = b.updated_at.timestamp()|int if b and b.updated_at else 0 %}
+{% set accent = b.accent if b and b.accent else '#0f5c4a' %}
+{% set background = b.background if b and b.background else '#eef1ef' %}
+{% set panel = b.panel if b and b.panel else '#ffffff' %}
+<div class="page-head">
+  <div><h1>Login page</h1><p class="sub">How your sign-in page looks to your team, and the accent colour used across your workspace.</p></div>
+  <div class="actions"><a class="btn btn-outline-primary" target="_blank" rel="noopener" href="{{ url_for('auth.login', slug=tenant.slug) }}">Open sign-in page</a></div>
+</div>
+
+<div class="row g-4 align-items-start">
+<div class="col-lg-7">
+<form method="post" enctype="multipart/form-data" class="card card-body" id="brandform">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <p class="text-body-secondary mb-4">Your team signs in at <b class="text-break text-body">{{ url_for('auth.login', slug=tenant.slug, _external=True) }}</b></p>
+
+  <h2 class="h5 mb-3">Words</h2>
+  <div class="mb-3"><label class="form-label" for="bh">Headline</label><input class="form-control" id="bh" type="text" name="headline" maxlength="120" placeholder="Welcome to {{ tenant.name }}" value="{{ b.headline if b and b.headline else '' }}"></div>
+  <div class="mb-4"><label class="form-label" for="bt">Tagline</label><input class="form-control" id="bt" type="text" name="tagline" maxlength="240" placeholder="Sell, count stock and keep track of who owes what, from the counter or your phone." value="{{ b.tagline if b and b.tagline else '' }}"></div>
+
+  <h2 class="h5 mb-3">Pictures</h2>
+  <div class="row g-3 mb-4">
+    <div class="col-md-6">
+      <label class="form-label" for="bl">Logo</label>
+      {% if b and b.logo %}<div class="d-flex align-items-center gap-2 mb-2"><img src="{{ url_for('tenant_public.login_logo', slug=tenant.slug) }}?v={{ ver }}" alt="Current logo" class="logo-md rounded"><div class="form-check m-0"><input class="form-check-input" type="checkbox" name="remove_logo" id="rl"><label class="form-check-label" for="rl">Remove</label></div></div>{% endif %}
+      <input class="form-control" id="bl" type="file" name="logo" accept="image/png,image/jpeg,image/webp">
+      <div class="form-text">PNG, JPEG or WebP, up to 2 MB. Shown at the top of the page.</div>
+    </div>
+    <div class="col-md-6">
+      <label class="form-label" for="bi">Side picture</label>
+      {% if b and b.image %}<div class="d-flex align-items-center gap-2 mb-2"><img src="{{ url_for('tenant_public.login_image', slug=tenant.slug) }}?v={{ ver }}" alt="Current picture" class="pic-thumb"><div class="form-check m-0"><input class="form-check-input" type="checkbox" name="remove_image" id="ri"><label class="form-check-label" for="ri">Remove</label></div></div>{% endif %}
+      <input class="form-control" id="bi" type="file" name="image" accept="image/png,image/jpeg,image/webp">
+      <div class="form-text">Fills the coloured panel beside the form. A photo of your shop works well.</div>
+    </div>
+  </div>
+
+  <h2 class="h5 mb-1">Colours</h2>
+  <p class="text-body-secondary small mb-3">The accent colours buttons and links across your workspace, in light and dark mode. Background and panel colour the sign-in page only.</p>
+  <div class="row g-3 mb-3">
+    {% for field, label, val in (('accent', 'Accent', accent), ('background', 'Background', background), ('panel', 'Panel', panel)) %}
+    <div class="col-sm-4"><label class="form-label" for="c-{{ field }}">{{ label }}</label>
+      <label class="swatch"><input type="color" id="c-{{ field }}" name="{{ field }}" value="{{ val }}" data-preview="{{ field }}"><span class="swatch-hex">{{ val }}</span></label></div>
+    {% endfor %}
+  </div>
+  <div class="form-check mb-4"><input class="form-check-input" type="checkbox" name="reset_colours" id="rc"><label class="form-check-label" for="rc">Go back to the standard colours</label></div>
+  <div><button class="btn btn-primary">Save changes</button></div>
+</form>
+</div>
+
+<div class="col-lg-5 brand-preview-col">
+  <div class="small fw-semibold text-body-secondary mb-2">Preview</div>
+  <div class="brand-preview" id="bp" style="--pv-bg:{{ background }};--pv-panel:{{ panel }};--pv-accent:{{ accent }}">
+    <div class="bp-card">
+      <div class="bp-side"{% if b and b.image %} style="background-image:linear-gradient(180deg,rgba(6,14,11,.1),rgba(6,14,11,.75)),url('{{ url_for('tenant_public.login_image', slug=tenant.slug) }}?v={{ ver }}')"{% endif %}>
+        <div class="bp-h" id="bp-h">{{ b.headline if b and b.headline else 'Welcome to ' ~ tenant.name }}</div>
+        <div class="bp-t" id="bp-t">{{ b.tagline if b and b.tagline else 'Sell, count stock and keep track of who owes what, from the counter or your phone.' }}</div>
+      </div>
+      <div class="bp-form"><div class="bp-title">Sign in</div><i></i><i></i><b>Sign in</b></div>
+    </div>
+  </div>
+  <p class="form-text mt-2">A sketch of your sign-in page. Save, then use Open sign-in page to see the real one.</p>
+</div>
+</div>
+<script>
+(() => {
+  const bp = document.getElementById('bp'), dflt = {accent: '#0f5c4a', background: '#eef1ef', panel: '#ffffff'};
+  const lum = h => { const n = [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255); return .2126 * n[0] + .7152 * n[1] + .0722 * n[2]; };
+  function paint() {
+    const reset = document.getElementById('rc').checked;
+    document.querySelectorAll('[data-preview]').forEach(i => {
+      const v = reset ? dflt[i.dataset.preview] : i.value;
+      i.closest('.swatch').querySelector('.swatch-hex').textContent = v;
+      bp.style.setProperty('--pv-' + (i.dataset.preview === 'background' ? 'bg' : i.dataset.preview), v);
+      if (i.dataset.preview === 'panel') bp.classList.toggle('pv-dark', lum(v) < .5);
+      if (i.dataset.preview === 'accent') bp.classList.toggle('pv-light-accent', lum(v) > .55);
+    });
+  }
+  document.querySelectorAll('[data-preview], #rc').forEach(i => i.addEventListener('input', paint));
+  document.getElementById('rc').addEventListener('change', paint);
+  document.getElementById('bh').addEventListener('input', e => document.getElementById('bp-h').textContent = e.target.value || {{ ('Welcome to ' ~ tenant.name)|tojson }});
+  document.getElementById('bt').addEventListener('input', e => document.getElementById('bp-t').textContent = e.target.value || 'Sell, count stock and keep track of who owes what, from the counter or your phone.');
+  paint();
+})();
+</script>
 {% endblock %}

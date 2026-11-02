@@ -11,7 +11,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from .config import load_settings
 from .security import init_security, limiter
 
-VERSION = "1.8.0"
+VERSION = "1.9.0"
 
 db = SQLAlchemy()
 login_manager = LoginManager()
@@ -116,6 +116,10 @@ def create_app(config=None):
 
     _register_error_pages(app)
 
+    @app.get("/favicon.ico")
+    def favicon():
+        return redirect(url_for("static", filename="favicon.svg"), 301)
+
     @app.get("/healthz")
     def healthz():
         db.session.execute(db.text("SELECT 1"))
@@ -179,17 +183,63 @@ def _rgb(h):
     return ",".join(str(int(h[i:i + 2], 16)) for i in (1, 3, 5))
 
 
+def _toward(h, target, cond):
+    """Mix colour `h` toward `target` in small steps until `cond(colour)` holds."""
+    for i in range(0, 21):
+        c = _mix(h, target, i / 20)
+        if cond(c):
+            return c
+    return target
+
+
+def _lift(h, target):
+    """Raise a colour's lightness (keeping its hue and most of its saturation) until it reaches `target` brightness."""
+    import colorsys
+
+    r, g, b = (int(h[i:i + 2], 16) / 255 for i in (1, 3, 5))
+    hue, light, sat = colorsys.rgb_to_hls(r, g, b)
+    for step in range(0, 41):
+        ll = light + (0.92 - light) * step / 40
+        rgb = colorsys.hls_to_rgb(hue, ll, min(1.0, sat * 1.1))
+        c = "#%02x%02x%02x" % tuple(round(x * 255) for x in rgb)
+        if _lum(c) >= target:
+            return c
+    return c
+
+
+def accent_palette(a):
+    """Everything the theme needs from one tenant accent, readable in light and dark mode.
+
+    Any colour a tenant picks works: a very light accent gets dark button text and darker links; a very dark accent
+    is lifted in dark mode so it still stands out; panels that carry white text always get a dark enough shade.
+    """
+    on = lambda c: "#0b1410" if _lum(c) > .55 else "#ffffff"  # noqa: E731
+    link_light = _toward(a, "#000000", lambda c: _lum(c) <= .32)
+    hero = _toward(a, "#000000", lambda c: _lum(c) <= .3)
+    dark = a if _lum(a) >= .55 else _lift(a, .55)
+    return {
+        "light": {"primary": a, "on": on(a), "link": link_light, "hover": _mix(link_light, "#000000", .2),
+                  "hero_a": hero, "hero_b": _mix(hero, "#000000", .55)},
+        "dark": {"primary": dark, "on": on(dark), "link": dark, "hover": _mix(dark, "#ffffff", .25),
+                 "hero_a": _mix(hero, "#0b100e", .25), "hero_b": _mix(hero, "#0b100e", .82)},
+    }
+
+
 def _theme_style():
-    """The tenant's accent colour, applied on top of Bootstrap's theme in both light and dark mode."""
+    """The tenant's accent colour, applied on top of the theme in both light and dark mode."""
     tenant = _tenant_for_theme()
     b = tenant.branding if tenant else None
     if not b or not b.accent:
         return ""
-    a = b.accent
-    return (":root,[data-bs-theme]{--bs-primary:%s;--bs-primary-rgb:%s;--bs-link-color:%s;--bs-link-color-rgb:%s;"
-            "--bs-link-hover-color:%s;--bs-link-hover-color-rgb:%s;--on-primary:%s;--hero-a:%s;--hero-b:%s}"
-            % (a, _rgb(a), a, _rgb(a), _mix(a, "#000000", .2), _rgb(_mix(a, "#000000", .2)),
-               "#10131c" if _lum(a) > .6 else "#ffffff", a, _mix(a, "#000000", .45)))
+    pal = accent_palette(b.accent)
+    css = []
+    for sel, v in ((":root,[data-bs-theme=light]", pal["light"]), ("[data-bs-theme=dark]", pal["dark"])):
+        css.append(
+            "%s{--bs-primary:%s;--bs-primary-rgb:%s;--on-primary:%s;--bs-link-color:%s;--bs-link-color-rgb:%s;"
+            "--bs-link-hover-color:%s;--bs-link-hover-color-rgb:%s;--hero-a:%s;--hero-b:%s}"
+            % (sel, v["primary"], _rgb(v["primary"]), v["on"], v["link"], _rgb(v["link"]), v["hover"], _rgb(v["hover"]),
+               v["hero_a"], v["hero_b"]))
+    return "".join(css)
 
 
 def _auth_colors():

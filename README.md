@@ -61,6 +61,12 @@ The interface is Bootstrap 5.3.8 (vendored under `app/static/vendor`) with a des
   self-hosted in `app/static/fonts` (SIL Open Font License) because the content security policy only allows local fonts.
 - **Layout:** sidebar grouped into Sell, Records and Settings; bottom tab bar on phones; a dashboard "till" with
   30-day takings and a 14-day bar chart; status badges as soft tints; designed 403/404/429/500 pages.
+- **Sign-in:** one card on the app canvas. A business page uses the business's accent or picture; the administrator
+  console uses the sidebar's ink, so the two are never confused.
+- **Tenant accents:** `accent_palette()` derives readable light and dark variants from any colour, so a very light or
+  very dark accent still gives legible buttons, links and panels.
+- **Forms:** `app/static/app.js` locks a form's button while it posts (no double sales or payments) and shows styled
+  confirmation dialogs for risky actions.
 
 ## Adding stock
 
@@ -76,6 +82,19 @@ The **Stock** page offers five ways in. Every addition is logged under *Recent s
   and reported by line number. A template CSV is linked on the page.
 
 Each product row also has an **Add** box to top up its stock by hand.
+
+### One barcode, one product
+
+A barcode never creates a second product, however it reaches the app (`app/barcodes.py`):
+
+- Codes are cleaned before they are stored: scanner prefixes such as `]E0`, tabs and line breaks are removed, and a
+  12-digit UPC-A is stored as its 13-digit EAN-13 form. Lookups also match codes stored with or without leading zeros.
+- Scanning an unknown code offers to link it to a product that has no barcode yet. Registering it under the name of
+  an existing product (ignoring case and spaces) links it to that product instead of creating a copy.
+- A label held in front of the camera counts once; the same code counts again only after it has left the view.
+- Each scan carries an id, so a resent or double-tapped request counts once. Every counted line has **Undo**.
+- **Possible duplicates** on the Stock page lists products that share a name or barcode. An admin can merge them:
+  stock, sales and stock history move into the product kept.
 
 ## Mobile money payments
 

@@ -107,10 +107,17 @@ const TT = (() => {
   async function scanBarcodes(video, onCode, onStatus) {
     let stopped = false, last = '', lastAt = 0;
     const status = t => { if (onStatus) onStatus(t); };
-    const emit = code => {
+    // A label held in front of the camera is read many times a second. Count it once, and only count the same
+    // code again after it has been out of view for GONE_MS (take the item away, bring the next one).
+    const GONE_MS = 1200;
+    const emit = raw => {
+      const code = String(raw || '').replace(/[\x00-\x1f\x7f\s]+/g, '');
+      if (!code) return;
       const now = Date.now();
-      if (code === last && now - lastAt < 2000) return;  // same label still in view
-      last = code; lastAt = now; status('Read ' + code); onCode(code);
+      const sameItem = code === last && now - lastAt < GONE_MS;
+      lastAt = now;
+      if (sameItem) return;
+      last = code; status('Read ' + code); onCode(code);
     };
     const ready = () => video.readyState >= 2 && video.videoWidth > 0;
 
@@ -152,5 +159,11 @@ const TT = (() => {
     return () => { stopped = true; };
   }
 
-  return {post, startCamera, stopCamera, frameToCanvas, fileToCanvas, toBlob, signature, scanBarcodes, decodeCanvas, csrf};
+  // A unique id per scan, so the server can ignore a resend of the same scan.
+  function uid() {
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 12);
+  }
+
+  return {uid, post, startCamera, stopCamera, frameToCanvas, fileToCanvas, toBlob, signature, scanBarcodes, decodeCanvas, csrf};
 })();

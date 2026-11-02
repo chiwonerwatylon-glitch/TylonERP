@@ -196,3 +196,44 @@ def test_designed_404_page(client):
 def test_fonts_are_served_locally(client):
     for name in ("instrument-sans.woff2", "bricolage-grotesque.woff2"):
         assert client.get(f"/static/fonts/{name}").status_code == 200
+
+
+# ---------------------------------------------------------------- theming and polish
+
+@pytest.mark.parametrize("accent", ["#0f5c4a", "#f4d03f", "#ffffff", "#000000", "#7a1f3d", "#0a66c2"])
+def test_any_accent_stays_readable(accent):
+    from app import _lum, accent_palette
+
+    pal = accent_palette(accent)
+    for mode in ("light", "dark"):
+        v = pal[mode]
+        assert _lum(v["hero_a"]) <= .32                      # white text on the till and sign-in panel
+        assert (v["on"] == "#ffffff") == (_lum(v["primary"]) <= .55)  # button text contrasts its button
+    assert _lum(pal["dark"]["primary"]) >= .5               # an accent never vanishes on a dark page
+    assert _lum(pal["light"]["link"]) <= .33                # links stay readable on white
+
+
+def test_tenant_accent_has_light_and_dark_rules(alpha, app, two_tenants):
+    from app.models import TenantBranding
+
+    with app.app_context():
+        db.session.add(TenantBranding(tenant_id=two_tenants["alpha"]["tenant"], accent="#7a1f3d"))
+        db.session.commit()
+    page = alpha.get("/t/alpha/app/").data
+    assert b"[data-bs-theme=dark]{--bs-primary:" in page and b"--bs-primary:#7a1f3d" in page
+
+
+def test_sign_in_pages_differ_for_console_and_business(client, two_tenants):
+    console, business = client.get("/login").data, client.get("/t/alpha").data
+    assert b"Administrator sign in" in console and b"signin-console" in console
+    assert b"Team sign-in" in business and b"signin-console" not in business
+
+
+def test_risky_actions_ask_first(alpha, two_tenants):
+    page = alpha.get("/t/alpha/app/products").data
+    assert b'data-confirm="Remove alpha soap?' in page and b"return confirm(" not in page
+
+
+def test_favicon(client):
+    assert client.get("/favicon.ico").status_code == 301
+    assert client.get("/static/favicon.svg").status_code == 200

@@ -30,10 +30,18 @@
       </div>
       <div><label class="form-label" for="bman">Or type a barcode</label>
         <div class="input-group mw-input"><input class="form-control" type="text" id="bman" inputmode="numeric" autocomplete="off"><button type="button" class="btn btn-outline-primary" id="bmanbtn">Add</button></div></div>
-      <div id="bnew" class="hidden card card-body bg-body-tertiary mt-3">
-        <p class="mb-2"><b>New barcode <span id="bcode"></span></b>. Enter the details to register it.</p>
-        <div class="row g-3 mb-3"><div class="col-sm-8"><label class="form-label" for="bname">Product name</label><input class="form-control" type="text" id="bname"></div><div class="col-sm-4"><label class="form-label" for="bprice">Price</label><input class="form-control" type="text" id="bprice" inputmode="decimal"></div></div>
-        <button type="button" class="btn btn-primary align-self-start" id="bsave">Register and count</button>
+      <div id="bnew" class="hidden card card-body bg-body-tertiary shadow-none mt-3">
+        <p class="mb-3"><b>New barcode <span id="bcode" class="font-monospace"></span></b>. Tell us which product it is.</p>
+        {% if unlinked %}
+        <label class="form-label" for="blink">It is a product already in your list</label>
+        <div class="d-flex gap-2 flex-wrap mb-3">
+          <select class="form-select flex-grow-1 mw-input" id="blink"><option value="">Choose a product without a barcode</option>{% for p in unlinked %}<option value="{{ p.id }}">{{ p.name }} ({{ p.stock }} in stock)</option>{% endfor %}</select>
+          <button type="button" class="btn btn-primary" id="blinkbtn">Link and count</button>
+        </div>
+        <div class="or-rule"><span>or register a new product</span></div>
+        {% endif %}
+        <div class="row g-3 mb-3"><div class="col-sm-8"><label class="form-label" for="bname">Product name</label><input class="form-control" type="text" id="bname" maxlength="150" autocomplete="off"></div><div class="col-sm-4"><label class="form-label" for="bprice">Price</label><input class="form-control" type="text" id="bprice" inputmode="decimal"></div></div>
+        <div class="d-flex gap-2 flex-wrap"><button type="button" class="btn btn-primary" id="bsave">Register and count</button><button type="button" class="btn btn-outline-secondary" id="bcancel">Skip this code</button></div>
       </div>
       <div id="blog" class="mt-3" aria-live="polite"></div>
     </div>
@@ -110,6 +118,30 @@
   </div>
 </form>
 
+{% if duplicates %}
+<div class="card mb-4 card-attn">
+  <div class="card-head"><h2>Possible duplicates</h2><span class="meta">{{ duplicates|length }} group{{ '' if duplicates|length == 1 else 's' }}</span></div>
+  <div class="card-body pt-3">
+    <p class="text-body-secondary mb-3">These products share a name or a barcode. {% if current_user.role == 'admin' %}Merging keeps one product and moves the others' stock, sales and history into it.{% else %}Ask an admin to merge them.{% endif %}</p>
+    {% for group in duplicates %}
+    <form method="post" action="{{ url_for('ws.merge_products') }}" class="dup-group" data-confirm="Merge these products?&#10;Stock, sales and history move into the product you chose to keep. This cannot be undone." data-confirm-ok="Merge">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      {% for p in group %}<input type="hidden" name="ids" value="{{ p.id }}">{% endfor %}
+      <div class="dup-items">
+        {% for p in group %}
+        <label class="dup-item">
+          {% if current_user.role == 'admin' %}<input class="form-check-input" type="radio" name="keep" value="{{ p.id }}" {{ 'checked' if loop.first }}>{% endif %}
+          <span><b>{{ p.name }}</b><span class="d-block small text-body-secondary">{{ p.stock }} in stock{% if p.barcode %}, barcode {{ p.barcode }}{% endif %}{% if p.photo %}, has photo{% endif %}</span></span>
+        </label>
+        {% endfor %}
+      </div>
+      {% if current_user.role == 'admin' %}<button class="btn btn-sm btn-primary">Merge into the selected product</button>{% endif %}
+    </form>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
 <div class="card mb-4">
   <div class="card-head flex-wrap">
     <h2>Products <span class="text-body-secondary fw-normal">{{ items|length }}</span></h2>
@@ -122,7 +154,7 @@
 <td class="text-end">{{ '{:,.2f}'.format(p.price) }}</td>
 <td class="text-nowrap"><span class="badge text-bg-{{ 'danger' if p.stock <= 0 else ('warning' if p.stock <= p.reorder_level else 'success') }}">{{ p.stock }}</span>{% if p.stock <= 0 %} <span class="small text-body-secondary">out</span>{% elif p.stock <= p.reorder_level %} <span class="small text-body-secondary">low</span>{% endif %}</td>
 <td><form method="post" action="{{ url_for('ws.restock', pid=p.id) }}" class="input-group input-group-sm w-qty"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input class="form-control" type="text" name="qty" inputmode="numeric" placeholder="Qty" aria-label="Units to add to {{ p.name }}"><button class="btn btn-outline-primary">Add</button></form></td>
-{% if current_user.role=='admin' %}<td class="text-end"><form method="post" action="{{ url_for('ws.product_delete', pid=p.id) }}" onsubmit="return confirm('Remove {{ p.name|e }}? Its sales history is kept.')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-link link-danger text-decoration-none">Remove</button></form></td>{% endif %}</tr>
+{% if current_user.role=='admin' %}<td class="text-end"><form method="post" action="{{ url_for('ws.product_delete', pid=p.id) }}" data-confirm="Remove {{ p.name }}?&#10;Its past sales stay in your records." data-confirm-ok="Remove" data-confirm-danger><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-link link-danger text-decoration-none">Remove</button></form></td>{% endif %}</tr>
 {% else %}<tr><td colspan="6" class="text-body-secondary">No products yet. Pick a way to register one above.</td></tr>{% endfor %}
 <tr class="hidden" id="pnone"><td colspan="6" class="text-body-secondary">No product matches that search.</td></tr>
 </tbody></table></div>
@@ -131,8 +163,9 @@
 {% if history %}
 <div class="card">
   <div class="card-head"><h2>Recent stock added</h2><span class="meta">Last {{ history|length }}</span></div>
-  <div class="table-responsive"><table class="table align-middle"><thead><tr><th>When</th><th>Product</th><th class="text-end">Added</th><th>How</th><th>By</th></tr></thead><tbody>
-{% for m in history %}<tr><td class="text-nowrap text-body-secondary">{{ m.created_at.strftime('%d %b, %H:%M') }}</td><td class="fw-semibold">{{ m.product.name }}</td><td class="text-end"><span class="badge text-bg-success">+{{ m.quantity }}</span></td><td>{{ m.source_label }}{% if m.note %}<br><span class="text-body-secondary small">{{ m.note }}</span>{% endif %}</td><td class="text-body-secondary">{{ m.user.name if m.user else '' }}</td></tr>{% endfor %}
+  <div class="table-responsive"><table class="table align-middle"><thead><tr><th>When</th><th>Product</th><th class="text-end">Added</th><th>How</th><th>By</th><th><span class="visually-hidden">Undo</span></th></tr></thead><tbody>
+{% for m in history %}<tr><td class="text-nowrap text-body-secondary">{{ m.created_at.strftime('%d %b, %H:%M') }}</td><td class="fw-semibold">{{ m.product.name }}</td><td class="text-end"><span class="badge text-bg-success">+{{ m.quantity }}</span></td><td>{{ m.source_label }}{% if m.note %}<br><span class="text-body-secondary small">{{ m.note }}</span>{% endif %}</td><td class="text-body-secondary">{{ m.user.name if m.user else '' }}</td>
+<td class="text-end">{% if m.source != 'new' and m.created_at > now - undo_window and (current_user.role == 'admin' or m.created_by == current_user.id) %}<form method="post" action="{{ url_for('ws.undo_stock', mid=m.id) }}" data-confirm="Take {{ m.quantity }} back off {{ m.product.name }}?&#10;Use this when stock was counted by mistake." data-confirm-ok="Undo"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-link text-decoration-none p-0">Undo</button></form>{% endif %}</td></tr>{% endfor %}
 </tbody></table></div>
 </div>
 {% endif %}
@@ -164,31 +197,81 @@
   });
 
   // ---- barcode counting
-  let bstream = null, bstop = null;
-  const log = (t, k) => { const d = document.createElement('div'); d.className = 'alert py-2 my-2 alert-' + (k === 'ok' ? 'success' : k === 'error' ? 'danger' : 'secondary'); d.textContent = t; $('blog').prepend(d); };
-  async function handleCode(code, extra) {
-    const r = await TT.post(scanUrl, Object.assign({barcode: code, quantity: $('bqty').value.trim() || '1'}, extra || {}));
-    if (r.error) { log(r.error, 'error'); return r; }
-    if (r.found) { $('bnew').classList.add('hidden'); log((r.created ? 'Registered ' : 'Counted ') + r.product.name + ' (+' + r.added + ') – now ' + r.product.stock + ' in stock', 'ok'); if (navigator.vibrate) navigator.vibrate(60); }
-    else { $('bcode').textContent = code; $('bnew').dataset.code = code; $('bnew').classList.remove('hidden'); $('bname').focus(); }
-    return r;
+  // Every read gets its own scan id. A retried or double-tapped request reuses it, so the server counts it once.
+  const undoUrl = id => "{{ url_for('ws.undo_stock', mid=0) }}".replace('/0/', '/' + id + '/');
+  let bstream = null, bstop = null, starting = false;
+  const busy = new Set();
+  function log(text, kind, movement) {
+    const d = document.createElement('div');
+    d.className = 'alert py-2 my-2 alert-' + (kind === 'ok' ? 'success' : kind === 'error' ? 'danger' : 'secondary');
+    const t = document.createElement('span'); t.className = 'flex-grow-1'; t.textContent = text; d.appendChild(t);
+    if (movement) {
+      const u = document.createElement('button'); u.type = 'button'; u.className = 'btn btn-sm btn-link p-0 ms-2 fw-semibold'; u.textContent = 'Undo';
+      u.onclick = async () => {
+        u.disabled = true;
+        const r = await TT.post(undoUrl(movement), {});
+        t.textContent = r.message || r.error; d.className = 'alert py-2 my-2 alert-' + (r.ok ? 'secondary' : 'danger'); u.remove();
+      };
+      d.appendChild(u);
+    }
+    $('blog').prepend(d);
+    while ($('blog').children.length > 8) $('blog').lastChild.remove();
+  }
+  function showNew(code) {
+    $('bcode').textContent = code; $('bnew').dataset.code = code; $('bnew').dataset.sid = TT.uid();
+    $('bnew').classList.remove('hidden'); $('bname').focus();
+  }
+  function hideNew() { $('bnew').classList.add('hidden'); delete $('bnew').dataset.code; $('bname').value = ''; $('bprice').value = ''; if ($('blink')) $('blink').value = ''; }
+  async function handleCode(code, extra, sid) {
+    const k = code + '|' + (extra ? 'reg' : 'scan');
+    if (busy.has(k)) return {};
+    busy.add(k);
+    try {
+      const r = await TT.post(scanUrl, Object.assign({barcode: code, quantity: $('bqty').value.trim() || '1', scan_id: sid || TT.uid()}, extra || {}));
+      if (r.error) { log(r.error, 'error'); return r; }
+      if (r.found) {
+        if ($('bnew').dataset.code === code) hideNew();
+        const verb = r.created ? 'Registered' : r.linked ? 'Linked the barcode to' : 'Counted';
+        log(verb + ' ' + r.product.name + ' (+' + r.added + '), now ' + r.product.stock + ' in stock', 'ok', r.movement);
+        if (r.linked && $('blink')) { const o = $('blink').querySelector('option[value="' + r.product.id + '"]'); if (o) o.remove(); }
+        if (navigator.vibrate) navigator.vibrate(60);
+      } else showNew(code);
+      return r;
+    } finally { busy.delete(k); }
   }
   async function stopBarcode() {
     if (bstop) { bstop(); bstop = null; }
     TT.stopCamera(bstream, $('bv')); bstream = null;
-    $('bstart').classList.remove('hidden'); $('bstop').classList.add('hidden'); $('bhint').textContent = 'Camera is off';
+    $('bstart').classList.remove('hidden'); $('bstart').disabled = false; $('bstop').classList.add('hidden'); $('bhint').textContent = 'Camera is off';
   }
   $('bstart').onclick = async () => {
+    if (starting || bstream) return;  // never run two scanners at once
+    starting = true; $('bstart').disabled = true;
     try {
       bstream = await TT.startCamera($('bv'));
       bstop = await TT.scanBarcodes($('bv'), code => handleCode(code), t => $('bhint').textContent = t);
       $('bstart').classList.add('hidden'); $('bstop').classList.remove('hidden'); $('bhint').textContent = 'Hold the barcode inside the box';
     } catch (e) { log(e.message, 'error'); stopBarcode(); }
+    finally { starting = false; $('bstart').disabled = false; }
   };
   $('bstop').onclick = stopBarcode;
-  $('bmanbtn').onclick = () => { const v = $('bman').value.trim(); if (v) { handleCode(v); $('bman').value = ''; } };
+  $('bmanbtn').onclick = () => { const v = $('bman').value.trim(); if (v) { handleCode(v); $('bman').value = ''; $('bman').focus(); } };
   $('bman').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); $('bmanbtn').click(); } };
-  $('bsave').onclick = () => handleCode($('bnew').dataset.code, {name: $('bname').value, price: $('bprice').value}).then(r => { if (r.found) { $('bname').value = ''; $('bprice').value = ''; } });
+  $('bsave').onclick = async () => {
+    if (!$('bnew').dataset.code) return;
+    $('bsave').disabled = true;
+    try { await handleCode($('bnew').dataset.code, {name: $('bname').value, price: $('bprice').value}, $('bnew').dataset.sid); }
+    finally { $('bsave').disabled = false; }
+  };
+  if ($('blinkbtn')) $('blinkbtn').onclick = async () => {
+    if (!$('bnew').dataset.code) return;
+    if (!$('blink').value) { $('blink').focus(); return; }
+    $('blinkbtn').disabled = true;
+    try { await handleCode($('bnew').dataset.code, {product_id: $('blink').value}, $('bnew').dataset.sid); }
+    finally { $('blinkbtn').disabled = false; }
+  };
+  $('bcancel').onclick = hideNew;
+  $('bname').onkeydown = $('bprice').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); $('bsave').click(); } };
 
   // ---- photo / scent
   let pstream = null;

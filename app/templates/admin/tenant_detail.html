@@ -14,7 +14,7 @@
 <div class="card card-body"><h2 class="h5">Account</h2>
 <p class="text-body-secondary">{{ tenant.contact_email }} &middot; {{ tenant.slug }}{% if tenant.phone %} &middot; {{ tenant.phone }}{% endif %}</p>
 <div class="d-flex flex-wrap gap-2">
-<form method="post" action="{{ url_for('admin.tenant_reset', tenant_id=tenant.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-outline-secondary">Reset owner password</button></form>
-<form method="post" action="{{ url_for('admin.tenant_toggle', tenant_id=tenant.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-outline-danger">{{ 'Suspend' if tenant.is_active else 'Activate' }} tenant</button></form>
+<form method="post" action="{{ url_for('admin.tenant_reset', tenant_id=tenant.id) }}" data-confirm="Reset the owner's password?&#10;Their current password stops working. You get a temporary one to pass on." data-confirm-ok="Reset password"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-outline-secondary">Reset owner password</button></form>
+<form method="post" action="{{ url_for('admin.tenant_toggle', tenant_id=tenant.id) }}"{% if tenant.is_active %} data-confirm="Suspend {{ tenant.name }}?&#10;Nobody at this business can sign in until you activate it again." data-confirm-ok="Suspend" data-confirm-danger{% endif %}><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-outline-danger">{{ 'Suspend' if tenant.is_active else 'Activate' }} tenant</button></form>
 </div></div>
 {% endblock %}

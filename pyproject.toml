@@ -1,6 +1,6 @@
 [project]
 name = "tylonerp"
-version = "1.8.0"
+version = "1.9.0"
 description = "Multi-tenant ERP: stock, sales, clients and debtors."
 readme = "README.md"
 requires-python = ">=3.12"

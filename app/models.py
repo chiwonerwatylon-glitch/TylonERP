@@ -156,6 +156,7 @@ class StockMovement(db.Model):
     note = db.Column(db.String(120))
     created_by = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"))
     created_at = db.Column(db.DateTime, nullable=False, default=utcnow, index=True)
+    client_ref = db.Column(db.String(40), index=True)  # the scanner's id for this scan, so a resend counts once
     product = db.relationship("Product", backref=db.backref("movements", cascade="all, delete-orphan",
                                                             passive_deletes=True))
     user = db.relationship("User")

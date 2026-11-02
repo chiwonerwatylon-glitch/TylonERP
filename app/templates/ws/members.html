@@ -16,8 +16,8 @@
 {% for u in users %}<tr><td class="fw-semibold">{{ u.name }}<br><span class="text-body-secondary small fw-normal">{{ u.email }}</span></td><td>{{ u.role|capitalize }}</td>
 <td><span class="badge text-bg-{{ 'success' if u.is_active_flag else 'danger' }}">{{ 'Active' if u.is_active_flag else 'Disabled' }}</span></td>
 <td class="text-end">{% if u.id != current_user.id %}<div class="d-flex gap-2 justify-content-end flex-wrap">
-<form method="post" action="{{ url_for('ws.member_reset', uid=u.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-secondary">Reset password</button></form>
-<form method="post" action="{{ url_for('ws.member_toggle', uid=u.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-danger">{{ 'Disable' if u.is_active_flag else 'Enable' }}</button></form></div>{% endif %}</td></tr>{% endfor %}</tbody></table></div></div>
+<form method="post" action="{{ url_for('ws.member_reset', uid=u.id) }}" data-confirm="Reset the password for {{ u.name }}?&#10;Their current password stops working. You get a temporary one to pass on." data-confirm-ok="Reset password"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-secondary">Reset password</button></form>
+<form method="post" action="{{ url_for('ws.member_toggle', uid=u.id) }}"{% if u.is_active_flag %} data-confirm="Disable {{ u.name }}?&#10;They can no longer sign in. You can enable them again at any time." data-confirm-ok="Disable" data-confirm-danger{% endif %}><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-danger">{{ 'Disable' if u.is_active_flag else 'Enable' }}</button></form></div>{% endif %}</td></tr>{% endfor %}</tbody></table></div></div>
 </div>
 </div>
 {% endblock %}

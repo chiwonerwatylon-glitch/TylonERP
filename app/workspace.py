@@ -10,7 +10,7 @@ from functools import wraps
 from flask import Blueprint, Response, abort, current_app, flash, g, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
-from . import db
+from . import barcodes, db
 from .models import Client, Product, Sale, StockMovement, Tenant, TenantBranding, TenantPayment, User, utcnow
 from .payments import (
     ECOCASH_RE,
@@ -92,11 +92,14 @@ def integer(v, default=None, maximum=2_000_000_000):
     return n if 0 <= n <= maximum else default
 
 
-def add_stock(p, qty, source, note=None):
-    """Increase a product's stock and keep a record of where it came from."""
+def add_stock(p, qty, source, note=None, ref=None):
+    """Increase a product's stock and keep a record of where it came from. Returns the record."""
     p.stock += qty
-    db.session.add(StockMovement(tenant_id=p.tenant_id, product=p, quantity=qty, source=source,
-                                 note=(note or "")[:120] or None, created_by=current_user.id))
+    m = StockMovement(tenant_id=p.tenant_id, product=p, quantity=qty, source=source,
+                      note=(note or "")[:120] or None, created_by=current_user.id, client_ref=ref)
+    db.session.add(m)
+    db.session.flush()
+    return m
 
 
 METHODS = ("cash", "ecocash", "onemoney")
@@ -285,16 +288,58 @@ def product_photo(pid):
     return Response(p.photo, mimetype=p.photo_mime, headers={"Cache-Control": "private, max-age=300"})
 
 
+def tidy_name(raw):
+    """Product names are compared ignoring case and repeated spaces, so tidy them the same way on save."""
+    return " ".join(str(raw or "").split())[:150]
+
+
+def product_by_barcode(code, lock=False):
+    """The tenant's product with this barcode, however the code was read or stored."""
+    forms = barcodes.variants(code)
+    if not forms:
+        return None
+    q = Product.query.filter(Product.tenant_id == tid(), Product.barcode.in_(forms))
+    if lock:
+        q = q.with_for_update()
+    found = q.all()
+    return next((p for p in found if p.barcode == code), found[0] if found else None)
+
+
+def product_by_name(name):
+    name = tidy_name(name).lower()
+    if not name:
+        return None
+    return Product.query.filter(Product.tenant_id == tid(), db.func.lower(Product.name) == name).first()
+
+
+def duplicate_groups():
+    """Products that look like the same thing: same name (ignoring case and spaces) or the same barcode."""
+    groups, seen = [], set()
+    items = Product.query.filter_by(tenant_id=tid()).order_by(Product.id).all()
+    for keyfn in (lambda p: tidy_name(p.name).lower(), lambda p: barcodes.key(p.barcode)):
+        buckets = {}
+        for p in items:
+            k = keyfn(p)
+            if k:
+                buckets.setdefault(k, []).append(p)
+        for group in buckets.values():
+            ids = frozenset(p.id for p in group)
+            if len(group) > 1 and ids not in seen:
+                seen.add(ids)
+                groups.append(group)
+    return groups
+
+
 @ws_bp.route("/products", methods=["GET", "POST"])
 @tenant_user
 def products():
     if request.method == "POST":
         f = request.form
         method = f.get("method", "photo")
-        name = f.get("name", "").strip()[:150]
+        name = tidy_name(f.get("name"))
         price = money(f.get("price"))
         stock = integer(f.get("stock"), None, MAX_QTY) if str(f.get("stock") or "").strip() else 0
-        barcode = f.get("barcode", "").strip()[:64] or None
+        barcode = barcodes.clean(f.get("barcode"))
         scent = f.get("scent", "").strip() or None
         sig = f.get("signature", "").strip().lower() or None
         file = request.files.get("photo")
@@ -318,11 +363,10 @@ def products():
             error = "Photo signature is invalid. Take the photo again."
         elif method in ("photo", "scent") and not sig:
             error = "Photo could not be analysed. Take the photo again."
-        elif barcode and (dup := Product.query.filter_by(tenant_id=tid(), barcode=barcode).first()):
+        elif barcode and (dup := product_by_barcode(barcode)):
             error = f"Barcode {barcode} already belongs to {dup.name}. Add stock to it instead."
-        elif method == "manual" and Product.query.filter(Product.tenant_id == tid(),
-                                                         db.func.lower(Product.name) == name.lower()).first():
-            error = f"{name} is already registered. Add stock to it instead."
+        elif dup := product_by_name(name):
+            error = f"{dup.name} is already registered. Add stock to it in the list below instead."
         elif sig and method in ("photo", "scent"):
             near = _best_matches(sig, 1)
             if near and near[0][0] < DUPLICATE_SCORE:
@@ -339,15 +383,17 @@ def products():
                 add_stock(p, stock, "new")
             try:
                 db.session.commit()
-                flash("Product added.", "ok")
+                flash(f"{name} added.", "ok")
             except Exception:
                 db.session.rollback()
                 flash("That barcode is already registered.", "error")
-        return redirect(url_for("ws.products"))
+        return redirect(url_for("ws.products", tab=method if method in ("photo", "scent", "manual") else None))
     items = Product.query.filter_by(tenant_id=tid()).order_by(Product.name).all()
     history = (StockMovement.query.filter_by(tenant_id=tid())
                .order_by(StockMovement.created_at.desc(), StockMovement.id.desc()).limit(15).all())
-    return render_template("ws/products.html", items=items, history=history, max_qty=MAX_QTY)
+    unlinked = [p for p in items if not p.barcode]
+    return render_template("ws/products.html", items=items, history=history, max_qty=MAX_QTY,
+                           duplicates=duplicate_groups(), unlinked=unlinked, undo_window=UNDO_WINDOW)
 
 
 @ws_bp.post("/products/scan-in")
@@ -356,40 +402,154 @@ def scan_in():
     """Counting stock in by barcode: each scan of a known code adds `quantity` units (default 1).
 
     A quantity above one suits a carton or a case: scan once and count the whole box.
-    An unknown code creates the product (name and price required) with that many units.
-    A code never creates a second product.
+    A code never creates a second product:
+    - it is cleaned and matched however it was read (UPC-A or EAN-13, scanner prefixes, lost zeros);
+    - an unknown code can be linked to a product that has no barcode yet (`product_id`), and registering it under
+      the name of an existing product links it to that product instead of creating a copy;
+    - `scan_id` makes a retried or double-sent scan count once.
     """
     j = request.get_json(silent=True) or {}
-    code = str(j.get("barcode", "")).strip()[:64]
+    code = barcodes.clean(j.get("barcode"))
     if not code:
         return {"error": "No barcode received."}, 400
     raw_qty = j.get("quantity")
     qty = integer(raw_qty, None, MAX_QTY) if str(raw_qty if raw_qty is not None else "").strip() else 1
     if not qty:
         return {"error": f"Units per scan must be a whole number from 1 to {MAX_QTY:,}."}, 400
-    p = Product.query.filter_by(tenant_id=tid(), barcode=code).with_for_update().first()
+    ref = str(j.get("scan_id") or "").strip()[:40] or None
+    if ref and (done := StockMovement.query.filter_by(tenant_id=tid(), client_ref=ref).first()):
+        return {"found": True, "repeat": True, "added": done.quantity, "movement": done.id,
+                "product": _product_json(done.product)}
+
+    def counted(p, source="scan", note=None, **extra):
+        m = add_stock(p, qty, source, note, ref=ref)
+        db.session.commit()
+        return {"found": True, "added": qty, "movement": m.id, "product": _product_json(p), **extra}
+
+    p = product_by_barcode(code, lock=True)
     if p:
-        add_stock(p, qty, "scan")
-        db.session.commit()
-        return {"found": True, "added": qty, "product": _product_json(p)}
-    name, price = str(j.get("name", "")).strip()[:150], money(j.get("price"))
-    if not name or price is None:
-        if j.get("name") is not None or j.get("price") is not None:
-            return {"found": False, "barcode": code, "error": "Enter the product name and a valid price."}
+        return counted(p)
+
+    # Unknown code: link it to an existing product the cashier picked.
+    if j.get("product_id"):
+        p = Product.query.filter_by(id=integer(j.get("product_id"), -1), tenant_id=tid()).with_for_update().first()
+        if not p:
+            return {"error": "That product no longer exists."}, 404
+        if p.barcode:
+            return {"found": False, "barcode": code,
+                    "error": f"{p.name} already has barcode {p.barcode}. Pick another product or register a new one."}, 409
+        p.barcode = code
+        return counted(p, note=f"Barcode {code} linked", linked=True)
+
+    name, price = tidy_name(j.get("name")), money(j.get("price"))
+    if not name and j.get("name") is None and j.get("price") is None:
         return {"found": False, "barcode": code}
-    p = Product(tenant_id=tid(), name=name, price=price, stock=0, method="barcode", barcode=code,
-                reorder_level=5)
+    if not name:
+        return {"found": False, "barcode": code, "error": "Enter the product name."}
+    existing = product_by_name(name)
+    if existing:
+        if existing.barcode:
+            return {"found": False, "barcode": code,
+                    "error": f"{existing.name} already has barcode {existing.barcode}. If this is a different "
+                             "product, give it a different name, for example with its size."}, 409
+        existing.barcode = code
+        return counted(existing, note=f"Barcode {code} linked", linked=True)
+    if price is None:
+        return {"found": False, "barcode": code, "error": "Enter a valid price for the new product."}
+    p = Product(tenant_id=tid(), name=name, price=price, stock=0, method="barcode", barcode=code, reorder_level=5)
     db.session.add(p)
-    add_stock(p, qty, "new", "Registered by scan")
     try:
-        db.session.commit()
-    except Exception:  # lost a race with another scanner
+        db.session.flush()
+    except Exception:  # lost a race with another scanner registering the same code
         db.session.rollback()
-        p = Product.query.filter_by(tenant_id=tid(), barcode=code).first_or_404()
-        add_stock(p, qty, "scan")
-        db.session.commit()
-        return {"found": True, "added": qty, "product": _product_json(p)}
-    return {"found": True, "created": True, "added": qty, "product": _product_json(p)}
+        p = product_by_barcode(code, lock=True)
+        if not p:
+            return {"error": "Could not register that barcode. Try again."}, 409
+        return counted(p)
+    return counted(p, "new", "Registered by scan", created=True)
+
+
+UNDO_WINDOW = timedelta(hours=24)
+
+
+@ws_bp.post("/stock/<int:mid>/undo")
+@tenant_user
+def undo_stock(mid):
+    """Take back a stock addition made by mistake (a double scan, a wrong quantity)."""
+    m = StockMovement.query.filter_by(id=mid, tenant_id=tid()).first()
+    wants_json = request.is_json or request.accept_mimetypes.best == "application/json"
+
+    def reply(msg, ok, status=200):
+        if wants_json:
+            return ({"ok": ok, "message": msg, "stock": m.product.stock if (m and ok) else None}, status)
+        flash(msg, "ok" if ok else "error")
+        return redirect(url_for("ws.products"))
+
+    if not m:
+        return reply("That stock entry was already undone.", False, 404)
+    if current_user.role != "admin" and m.created_by != current_user.id:
+        return reply("Only the person who added it, or an admin, can undo this.", False, 403)
+    if utcnow() - m.created_at > UNDO_WINDOW:
+        return reply("Stock added more than a day ago cannot be undone. Use a sale or adjust by hand.", False, 409)
+    p = Product.query.filter_by(id=m.product_id, tenant_id=tid()).with_for_update().first()
+    if p.stock < m.quantity:
+        return reply(f"Only {p.stock} of {p.name} are left, so {m.quantity} cannot be taken back.", False, 409)
+    p.stock -= m.quantity
+    name, qty = p.name, m.quantity
+    db.session.delete(m)
+    db.session.commit()
+    m = None
+    if wants_json:
+        return {"ok": True, "message": f"Took back {qty} of {name}.", "stock": p.stock}
+    flash(f"Took back {qty} of {name}.", "ok")
+    return redirect(url_for("ws.products"))
+
+
+@ws_bp.post("/products/merge")
+@tenant_admin
+def merge_products():
+    """Fold duplicate products into the one to keep: stock, sales, stock history, barcode and photo move over.
+
+    The form sends `keep` and every product id in the group as `ids`; all but `keep` are merged into it.
+    """
+    keep_id = integer(request.form.get("keep"), -1)
+    ids = {i for i in (integer(x, -1) for x in request.form.getlist("ids")) if i > 0} - {keep_id}
+    keep = Product.query.filter_by(id=keep_id, tenant_id=tid()).with_for_update().first()
+    drops = Product.query.filter(Product.tenant_id == tid(), Product.id.in_(ids)).with_for_update().all() if ids else []
+    if not keep or not drops:
+        flash("Choose which product to keep and at least one to merge into it.", "error")
+        return redirect(url_for("ws.products"))
+    codes = {barcodes.key(p.barcode) for p in [keep, *drops] if p.barcode}
+    if len(codes) > 1:
+        flash("These products have different barcodes, so they are different products. Rename one instead.", "error")
+        return redirect(url_for("ws.products"))
+    moved_barcode = None if keep.barcode else next((p.barcode for p in drops if p.barcode), None)
+    for drop in drops:
+        keep.stock += drop.stock
+        Sale.query.filter_by(tenant_id=tid(), product_id=drop.id).update({"product_id": keep.id})
+        StockMovement.query.filter_by(tenant_id=tid(), product_id=drop.id).update({"product_id": keep.id})
+        db.session.expire(drop, ["movements"])  # they belong to `keep` now; do not cascade-delete them
+        for attr in ("sku", "scent", "photo", "photo_mime", "signature"):
+            if not getattr(keep, attr) and getattr(drop, attr):
+                setattr(keep, attr, getattr(drop, attr))
+        db.session.delete(drop)
+    db.session.flush()  # free the barcode before giving it to the product we keep
+    if moved_barcode:
+        keep.barcode = moved_barcode
+    db.session.commit()
+    ensure_barcode_index()
+    n = len(drops)
+    flash(f"Merged {n} duplicate{'s' if n != 1 else ''} into {keep.name}. It now has {keep.stock} in stock.", "ok")
+    return redirect(url_for("ws.products"))
+
+
+def ensure_barcode_index():
+    """Create the one-barcode-per-product rule if older duplicate data stopped it being created at start-up."""
+    try:
+        with db.engine.begin() as conn:
+            conn.execute(db.text("CREATE UNIQUE INDEX IF NOT EXISTS uq_product_barcode ON products (tenant_id, barcode)"))
+    except Exception:  # duplicates still exist; the Stock page lists them for merging
+        pass
 
 
 # ------------------------------------------------------------ bulk import
@@ -448,14 +608,15 @@ def import_stock(rows, update_prices=False):
     Returns a summary dict and a list of per-line problems; good rows are applied even if others fail.
     """
     products = Product.query.filter_by(tenant_id=tid()).all()
-    by_barcode = {p.barcode: p for p in products if p.barcode}
+    by_barcode = {barcodes.key(p.barcode): p for p in products if p.barcode}
     by_sku = {p.sku.lower(): p for p in products if p.sku}
-    by_name = {p.name.lower(): p for p in products}
+    by_name = {tidy_name(p.name).lower(): p for p in products}
     summary = {"created": 0, "restocked": 0, "units": 0}
     problems = []
     for r in rows:
-        line, name = r["line"], (r.get("name") or "")[:150]
-        barcode, sku = (r.get("barcode") or "")[:64] or None, (r.get("sku") or "")[:60] or None
+        line, name = r["line"], tidy_name(r.get("name"))
+        barcode, sku = barcodes.clean(r.get("barcode")), (r.get("sku") or "")[:60] or None
+        bkey = barcodes.key(barcode)
         qty = integer(r.get("quantity"), None, MAX_QTY) if r.get("quantity") else 0
         price = money(r.get("price")) if r.get("price") else None
         if qty is None:
@@ -464,15 +625,15 @@ def import_stock(rows, update_prices=False):
         if r.get("price") and price is None:
             problems.append(f"Line {line}: price {r['price']!r} is not a valid amount.")
             continue
-        p = (by_barcode.get(barcode) if barcode else None) or (by_sku.get(sku.lower()) if sku else None) \
+        p = (by_barcode.get(bkey) if barcode else None) or (by_sku.get(sku.lower()) if sku else None) \
             or (by_name.get(name.lower()) if name else None)
         if p:
-            if barcode and p.barcode and p.barcode != barcode:
+            if barcode and p.barcode and barcodes.key(p.barcode) != bkey:
                 problems.append(f"Line {line}: {p.name} already has barcode {p.barcode}, not {barcode}.")
                 continue
-            if barcode and not p.barcode and barcode not in by_barcode:
+            if barcode and not p.barcode and bkey not in by_barcode:
                 p.barcode = barcode
-                by_barcode[barcode] = p
+                by_barcode[bkey] = p
             if update_prices and price is not None:
                 p.price = price
             if qty:
@@ -493,7 +654,7 @@ def import_stock(rows, update_prices=False):
         summary["units"] += qty
         by_name[name.lower()] = p
         if barcode:
-            by_barcode[barcode] = p
+            by_barcode[bkey] = p
         if sku:
             by_sku[sku.lower()] = p
     return summary, problems
@@ -559,9 +720,9 @@ def quick_sell():
 @tenant_user
 def quick_match():
     j = request.get_json(silent=True) or {}
-    code = str(j.get("barcode", "")).strip()
+    code = barcodes.clean(j.get("barcode"))
     if code:
-        p = Product.query.filter_by(tenant_id=tid(), barcode=code).first()
+        p = product_by_barcode(code)
         if not p:
             return {"matches": [], "message": f"No product has barcode {code}."}
         return {"matches": [_product_json(p, 0.0)]}
