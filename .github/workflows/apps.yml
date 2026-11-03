@@ -16,12 +16,13 @@ jobs:
   android:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
-      - uses: android-actions/setup-android@v3
+      # The runner image already has the Android SDK (ANDROID_HOME) with its licences accepted; the Android Gradle
+      # plugin downloads the SDK platform it needs.
       - uses: gradle/actions/setup-gradle@v4
       - name: Use your own signing key when one is set up as secrets
         env:
@@ -55,7 +56,7 @@ jobs:
   ios:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Generate the Xcode project
         working-directory: ios
         run: |
