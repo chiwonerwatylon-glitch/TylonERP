@@ -4,7 +4,7 @@
 <div class="row g-3 mb-3">
   <div class="col-6 col-lg-4"><div class="card stat h-100"><div class="k">Plan</div><div class="v">{{ tenant.plan_label }}</div></div></div>
   <div class="col-6 col-lg-4"><div class="card stat h-100"><div class="k">Users</div><div class="v">{{ tenant.users|length }} / {{ tenant.max_users }}</div></div></div>
-  <div class="col-12 col-lg-4"><div class="card stat h-100"><div class="k">Registered</div><div class="v">{{ tenant.created_at.strftime('%d %b %Y') }}</div></div></div>
+  <div class="col-12 col-lg-4"><div class="card stat h-100"><div class="k">Registered</div><div class="v">{{ (tenant.created_at|dt('date')) }}</div></div></div>
 </div>
 <div class="card card-body mb-3"><h2 class="h5">Subscription</h2>
 <form method="post" action="{{ url_for('admin.tenant_plan', tenant_id=tenant.id) }}" class="row g-2">

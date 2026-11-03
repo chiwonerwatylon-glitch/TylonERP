@@ -34,6 +34,45 @@ class Tenant(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=utcnow)
     users = db.relationship("User", backref="tenant", cascade="all, delete-orphan")
 
+    # Regional settings (Business settings page). Blank means the default noted on each property.
+    country = db.Column(db.String(2))
+    currency = db.Column(db.String(3))
+    locale = db.Column(db.String(16))  # number and date format, e.g. en_ZW, pt_MZ, fr_SN
+    language = db.Column(db.String(5))  # default screen language for members who have not chosen one
+    timezone = db.Column(db.String(40))
+    tax_name = db.Column(db.String(20))
+    tax_rate = db.Column(db.Numeric(5, 2))
+    tax_inclusive = db.Column(db.Boolean)  # True: shelf prices already include tax
+    tax_number = db.Column(db.String(40))
+    alt_currency = db.Column(db.String(3))  # a second currency customers may pay in
+    alt_rate = db.Column(db.Numeric(16, 6))  # units of alt_currency per 1 unit of currency
+    address = db.Column(db.String(240))
+    receipt_footer = db.Column(db.String(240))
+
+    @property
+    def currency_code(self):
+        return (self.currency or "USD").upper()
+
+    @property
+    def number_locale(self):
+        return self.locale or "en_ZW"
+
+    @property
+    def tz(self):
+        return self.timezone or "Africa/Harare"
+
+    @property
+    def tax_label(self):
+        return self.tax_name or "VAT"
+
+    @property
+    def tax_percent(self):
+        return Decimal(self.tax_rate or 0)
+
+    @property
+    def tax_is_inclusive(self):
+        return True if self.tax_inclusive is None else bool(self.tax_inclusive)
+
     @property
     def max_users(self):
         return PLANS[self.plan]["max_users"]
@@ -77,6 +116,7 @@ class User(UserMixin, db.Model):
     name = db.Column(db.String(150), nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
     role = db.Column(db.String(20), nullable=False, default="staff")  # superadmin, admin, staff
+    language = db.Column(db.String(5))  # screen language; blank follows the business
     is_active_flag = db.Column("is_active", db.Boolean, nullable=False, default=True)
     must_change_password = db.Column(db.Boolean, nullable=False, default=False)
     failed_attempts = db.Column(db.Integer, nullable=False, default=0)
@@ -141,6 +181,7 @@ class Product(db.Model):
     photo = db.Column(db.LargeBinary)
     photo_mime = db.Column(db.String(40))
     signature = db.Column(db.String(70))  # 16 hex dHash + 54 hex colour grid
+    category = db.Column(db.String(60))  # groups products on the Register, e.g. Drinks, Groceries
 
     __table_args__ = (db.Index("uq_product_barcode", "tenant_id", "barcode", unique=True),)
 
@@ -201,14 +242,24 @@ class Sale(db.Model):
     payment_phone = db.Column(db.String(20))
     payment_ref = db.Column(db.String(60))  # EcoCash reference, or the OneMoney transaction code
     payment_correlator = db.Column(db.String(60))
+    # Sales rung up together on the Register share an order; one receipt covers them all.
+    order_id = db.Column(db.Integer, db.ForeignKey("orders.id", ondelete="SET NULL"), index=True)
+    discount = db.Column(db.Numeric(12, 2))  # taken off this line
+    tax = db.Column(db.Numeric(12, 2))  # tax on this line (inside line_total either way)
+    line_total = db.Column(db.Numeric(12, 2))  # what the customer pays for this line; NULL on older sales
 
     @property
     def method_label(self):
-        return {"ecocash": "EcoCash", "onemoney": "OneMoney"}.get(self.payment_method, "Cash")
+        return METHOD_LABELS.get(self.payment_method or "cash", (self.payment_method or "cash").capitalize())
 
     @property
     def total(self):
-        return self.quantity * self.unit_price
+        return self.line_total if self.line_total is not None else self.quantity * self.unit_price
+
+    @staticmethod
+    def total_sql():
+        """Sale.total as an SQL expression, for filters and sums."""
+        return db.func.coalesce(Sale.line_total, Sale.quantity * Sale.unit_price)
 
     @property
     def settled(self):
@@ -227,6 +278,66 @@ class Sale(db.Model):
         if self.paid >= self.total:
             return "Cash"
         return "Credit" if self.paid <= 0 else "Part-paid"
+
+
+METHOD_LABELS = {"cash": "Cash", "card": "Card", "bank": "Bank transfer", "mobile": "Mobile money",
+                 "ecocash": "EcoCash", "onemoney": "OneMoney", "credit": "On account", "split": "Split"}
+
+
+class Order(db.Model):
+    """One checkout on the Register: several products, one payment, one receipt.
+
+    The lines are ordinary Sale rows (order_id points here), so stock, debtors and the Sales page work as before.
+    Amounts are in the business's currency. When the customer pays in the second currency, `tender_currency`,
+    `rate` and `tendered` record what was handed over, and `change` what was given back in that currency.
+    """
+    __tablename__ = "orders"
+    id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(db.Integer, db.ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True)
+    client_id = db.Column(db.Integer, db.ForeignKey("clients.id", ondelete="SET NULL"))
+    currency = db.Column(db.String(3), nullable=False, default="USD")
+    subtotal = db.Column(db.Numeric(12, 2), nullable=False, default=0)  # before discounts
+    discount = db.Column(db.Numeric(12, 2), nullable=False, default=0)
+    tax = db.Column(db.Numeric(12, 2), nullable=False, default=0)
+    tax_inclusive = db.Column(db.Boolean)
+    tax_rate = db.Column(db.Numeric(5, 2))
+    tax_name = db.Column(db.String(20))
+    total = db.Column(db.Numeric(12, 2), nullable=False, default=0)
+    paid = db.Column(db.Numeric(12, 2), nullable=False, default=0)
+    payment_method = db.Column(db.String(12), nullable=False, default="cash")
+    payment_status = db.Column(db.String(12))  # pending, paid, refunded (EcoCash)
+    payment_phone = db.Column(db.String(20))
+    payment_ref = db.Column(db.String(60))
+    payment_provider = db.Column(db.String(30))  # M-Pesa, MTN MoMo, a card machine...
+    payment_correlator = db.Column(db.String(60))
+    tender_currency = db.Column(db.String(3))
+    rate = db.Column(db.Numeric(16, 6))
+    tendered = db.Column(db.Numeric(14, 2))
+    change = db.Column(db.Numeric(14, 2))
+    note = db.Column(db.String(200))
+    created_by = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"))
+    created_at = db.Column(db.DateTime, nullable=False, default=utcnow, index=True)
+    client_ref = db.Column(db.String(40))  # the register's id for this checkout, so a resend records once
+    lines = db.relationship("Sale", backref="order", order_by="Sale.id")
+    client = db.relationship("Client")
+    cashier = db.relationship("User")
+
+    __table_args__ = (db.Index("uq_order_ref", "tenant_id", "client_ref", unique=True),)
+
+    @property
+    def method_label(self):
+        label = METHOD_LABELS.get(self.payment_method, self.payment_method.capitalize())
+        return f"{label} · {self.payment_provider}" if self.payment_provider else label
+
+    @property
+    def balance(self):
+        if self.payment_status in ("pending", "refunded"):
+            return Decimal(0)
+        return max(Decimal(0), self.total - self.paid)
+
+    @property
+    def items(self):
+        return sum(s.quantity for s in self.lines)
 
 
 class SyncOp(db.Model):

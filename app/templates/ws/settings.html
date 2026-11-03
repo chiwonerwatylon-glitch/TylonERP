@@ -1,0 +1,86 @@
+{% extends "shell.html" %}
+{% from "_ui.html" import ico %}
+{% block title %}{{ _("Business settings") }} · {{ tenant.name }}{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>{{ _("Business settings") }}</h1><p class="sub">{{ _("Where you trade: your currency, tax, language, time zone and what your receipts say.") }}</p></div></div>
+
+<form method="post" class="row g-4 align-items-start" id="sform">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<div class="col-lg-8">
+  <div class="card card-body mb-4">
+    <h2 class="h5">{{ _("Country and money") }}</h2>
+    <p class="text-body-secondary small">{{ _("Choosing a country fills in its usual currency, time zone, number format and tax. Change anything that is different for you.") }}</p>
+    <div class="row g-3">
+      <div class="col-md-6"><label class="form-label" for="country">{{ _("Country") }}</label>
+        <select class="form-select" id="country" name="country"><option value="">—</option>{% for code, c in countries|dictsort(by='value') %}<option value="{{ code }}" data-cur="{{ c[1] }}" data-tz="{{ c[2] }}" data-loc="{{ c[3] }}" data-tax="{{ c[4] }}" data-rate="{{ c[5] }}"{% if tenant.country == code %} selected{% endif %}>{{ c[0] }}</option>{% endfor %}</select></div>
+      <div class="col-md-6"><label class="form-label" for="currency">{{ _("Currency you sell in") }}</label>
+        <select class="form-select" id="currency" name="currency">{% for c in currencies %}<option value="{{ c }}"{% if tenant.currency_code == c %} selected{% endif %}>{{ currency_label(c) }}</option>{% endfor %}</select>
+        <div class="form-text">{{ _("Prices, sales and reports are in this currency.") }}</div></div>
+      <div class="col-md-6"><label class="form-label" for="alt">{{ _("Second currency customers may pay in") }} <span class="text-body-secondary fw-normal">({{ _("optional") }})</span></label>
+        <select class="form-select" id="alt" name="alt_currency"><option value="">{{ _("None") }}</option>{% for c in currencies %}<option value="{{ c }}"{% if tenant.alt_currency == c %} selected{% endif %}>{{ currency_label(c) }}</option>{% endfor %}</select></div>
+      <div class="col-md-6" id="rateWrap"><label class="form-label" for="alt_rate">{{ _("Exchange rate") }}</label>
+        <div class="input-group"><span class="input-group-text">1 <span id="rcur" class="ms-1">{{ tenant.currency_code }}</span> =</span><input class="form-control" id="alt_rate" name="alt_rate" inputmode="decimal" value="{{ tenant.alt_rate|float if tenant.alt_rate else '' }}"><span class="input-group-text" id="ralt">{{ tenant.alt_currency or '' }}</span></div>
+        <div class="form-text">{{ _("Update it when the rate moves. The Register shows totals in both and gives change in the currency paid.") }}</div></div>
+    </div>
+  </div>
+
+  <div class="card card-body mb-4">
+    <h2 class="h5">{{ _("Sales tax") }}</h2>
+    <p class="text-body-secondary small">{{ _("The suggested rate is only a starting point. Check the rate that applies to your business.") }}</p>
+    <div class="row g-3">
+      <div class="col-sm-4"><label class="form-label" for="tax_name">{{ _("Tax name") }}</label><input class="form-control" id="tax_name" name="tax_name" maxlength="20" value="{{ tenant.tax_label }}"></div>
+      <div class="col-sm-4"><label class="form-label" for="tax_rate">{{ _("Rate") }} %</label><input class="form-control" id="tax_rate" name="tax_rate" inputmode="decimal" value="{{ tenant.tax_percent|float }}"></div>
+      <div class="col-sm-4"><label class="form-label" for="tax_number">{{ _("Tax number") }} <span class="text-body-secondary fw-normal">({{ _("optional") }})</span></label><input class="form-control" id="tax_number" name="tax_number" maxlength="40" value="{{ tenant.tax_number or '' }}"></div>
+      <div class="col-12">
+        <div class="form-check"><input class="form-check-input" type="radio" name="tax_mode" id="tin" value="inclusive"{% if tenant.tax_is_inclusive %} checked{% endif %}><label class="form-check-label" for="tin">{{ _("My prices already include tax") }} <span class="text-body-secondary">— {{ _("receipts show how much of the total is tax") }}</span></label></div>
+        <div class="form-check"><input class="form-check-input" type="radio" name="tax_mode" id="tex" value="exclusive"{% if not tenant.tax_is_inclusive %} checked{% endif %}><label class="form-check-label" for="tex">{{ _("Add tax on top of my prices at the till") }}</label></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card card-body mb-4">
+    <h2 class="h5">{{ _("Language, time and numbers") }}</h2>
+    <div class="row g-3">
+      <div class="col-md-4"><label class="form-label" for="language">{{ _("Screen language") }}</label>
+        <select class="form-select" id="language" name="language"><option value="">{{ _("Each person's browser") }}</option>{% for code, (name, r) in languages.items() %}<option value="{{ code }}"{% if tenant.language == code %} selected{% endif %}>{{ name }}</option>{% endfor %}</select>
+        <div class="form-text">{{ _("Members can still pick their own from the language menu.") }}</div></div>
+      <div class="col-md-4"><label class="form-label" for="locale">{{ _("Number and date format") }}</label>
+        <select class="form-select" id="locale" name="locale">{% for code, name in locale_names|dictsort(by='value') %}<option value="{{ code }}"{% if tenant.number_locale == code %} selected{% endif %}>{{ name }}</option>{% endfor %}</select>
+        <div class="form-text">{{ _("Now") }}: <span class="settings-sample">{{ sample }}</span></div></div>
+      <div class="col-md-4"><label class="form-label" for="timezone">{{ _("Time zone") }}</label>
+        <select class="form-select" id="timezone" name="timezone">{% for z in timezones %}<option value="{{ z }}"{% if tenant.tz == z %} selected{% endif %}>{{ z.replace('_', ' ') }}</option>{% endfor %}</select>
+        <div class="form-text">{{ _("Days on the dashboard and day report start at midnight here.") }}</div></div>
+    </div>
+  </div>
+
+  <div class="card card-body mb-4">
+    <h2 class="h5">{{ _("Receipts") }}</h2>
+    <div class="row g-3">
+      <div class="col-md-6"><label class="form-label" for="phone">{{ _("Phone") }}</label><input class="form-control" id="phone" name="phone" maxlength="40" value="{{ tenant.phone or '' }}"></div>
+      <div class="col-md-6"><label class="form-label" for="address">{{ _("Address") }}</label><input class="form-control" id="address" name="address" maxlength="240" value="{{ tenant.address or '' }}"></div>
+      <div class="col-12"><label class="form-label" for="receipt_footer">{{ _("Message at the bottom of receipts") }}</label><input class="form-control" id="receipt_footer" name="receipt_footer" maxlength="240" value="{{ tenant.receipt_footer or '' }}" placeholder="{{ _('Thank you for your business') }}"></div>
+    </div>
+  </div>
+  <button class="btn btn-primary btn-lg">{{ _("Save settings") }}</button>
+</div>
+<div class="col-lg-4">
+  <div class="card card-body">
+    <h2 class="h6 mb-2">{{ _("Selling in more than one country?") }}</h2>
+    <p class="small text-body-secondary mb-0">{{ _("Each business on TylonERP has its own currency, tax and time zone. Ask your administrator to register each country's shop as its own business, so its books stay in its own currency.") }}</p>
+  </div>
+</div>
+</form>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  $('country').addEventListener('change', e => {
+    const o = e.target.selectedOptions[0]; if (!o || !o.dataset.cur) return;
+    $('currency').value = o.dataset.cur; $('timezone').value = o.dataset.tz; $('tax_name').value = o.dataset.tax; $('tax_rate').value = o.dataset.rate;
+    if ([...$('locale').options].some(x => x.value === o.dataset.loc)) $('locale').value = o.dataset.loc;
+    sync();
+  });
+  const sync = () => { $('rateWrap').classList.toggle('opacity-50', !$('alt').value); $('alt_rate').disabled = !$('alt').value; $('rcur').textContent = $('currency').value; $('ralt').textContent = $('alt').value; };
+  $('alt').onchange = sync; $('currency').onchange = sync; sync();
+})();
+</script>
+{% endblock %}

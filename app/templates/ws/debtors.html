@@ -3,11 +3,11 @@
 {% block content %}
 <div class="page-head"><div><h1>Debtors</h1><p class="sub">Sales with money still owed. Record a payment as it comes in; the balance updates straight away.</p></div></div>
 <div class="row g-3 mb-4">
-  <div class="col-6 col-lg-3"><div class="card stat h-100"><div class="k">Total owed</div><div class="v{{ ' text-danger' if total > 0 }}">{{ '{:,.2f}'.format(total) }}</div></div></div>
+  <div class="col-6 col-lg-3"><div class="card stat h-100"><div class="k">Total owed</div><div class="v{{ ' text-danger' if total > 0 }}">{{ ((total)|money) }}</div></div></div>
   <div class="col-6 col-lg-3"><div class="card stat h-100"><div class="k">Open sales</div><div class="v">{{ items|length }}</div></div></div>
 </div>
 <div class="card"><div class="table-responsive"><table class="table align-middle"><thead><tr><th>Client</th><th>Sale</th><th class="text-end">Balance</th><th>Record payment</th></tr></thead><tbody>
-{% for s in items %}<tr><td class="fw-semibold">{{ s.client.name }}</td><td>{{ s.product_name }} &times; {{ s.quantity }}<br><span class="text-body-secondary small">{{ s.created_at.strftime('%d %b %Y') }}</span></td><td class="text-end fw-semibold text-danger">{{ '{:,.2f}'.format(s.balance) }}</td>
+{% for s in items %}<tr><td class="fw-semibold">{{ s.client.name }}</td><td>{{ s.product_name }} &times; {{ s.quantity }}<br><span class="text-body-secondary small">{{ (s.created_at|dt('date')) }}</span></td><td class="text-end fw-semibold text-danger">{{ ((s.balance)|money) }}</td>
 <td><form method="post" action="{{ url_for('ws.payment', sid=s.id) }}" class="input-group input-group-sm w-pay"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input class="form-control" type="text" name="amount" inputmode="decimal" placeholder="Amount"><button class="btn btn-primary">Pay</button></form></td></tr>
 {% else %}<tr><td colspan="4" class="text-body-secondary">Nobody owes you anything. Credit and part-paid sales appear here.</td></tr>{% endfor %}</tbody></table></div></div>
 {% endblock %}

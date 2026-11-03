@@ -1,0 +1,5 @@
+build/
+Payload/
+*.ipa
+TylonERP.xcodeproj/
+TylonERP/Info.plist

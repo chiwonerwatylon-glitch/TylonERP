@@ -1,11 +1,16 @@
 <!doctype html>
-<html lang="en" data-bs-theme="light"><head>
+<html lang="{{ lang|default('en') }}" dir="{{ 'rtl' if rtl else 'ltr' }}" data-bs-theme="light"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="csrf" content="{{ csrf_token() }}"><meta name="theme-color" content="#eef1ef">
 <title>{% block title %}TylonERP{% endblock %}</title>
 <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+<link rel="manifest" href="{{ url_for('pwa.tenant_manifest', slug=g.slug) if g.slug else url_for('pwa.manifest') }}">
+<link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="{{ (current_user.tenant.name if current_user.is_authenticated and current_user.tenant else 'TylonERP')[:30] }}">
 <script src="{{ url_for('static', filename='theme.js') }}"></script>
-<link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap.min.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap.rtl.min.css' if rtl else 'vendor/bootstrap.min.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 {% if theme_style %}<style>{{ theme_style|safe }}</style>{% endif %}
 </head><body>{% block body %}{% endblock %}

@@ -21,6 +21,7 @@ from .payments import (
     new_correlator,
     normalise_msisdn,
 )
+from .regional import local_now, to_local
 from .routes import EMAIL_RE
 from .secrets import encrypt
 
@@ -222,17 +223,18 @@ def home():
         "clients": Client.query.filter_by(tenant_id=tid()).count(),
         "low": Product.query.filter(Product.tenant_id == tid(), Product.stock <= Product.reorder_level).count(),
     }
-    # Takings per day for the last 14 days (UTC days), oldest first, for the bar chart.
-    today = now.date()
+    # Takings per day for the last 14 days, in the business's own time zone, oldest first, for the bar chart.
+    today = local_now(t.tz).date()
     days = [today - timedelta(days=i) for i in range(13, -1, -1)]
     by_day = dict.fromkeys(days, Decimal(0))
+    local_day = {s.id: to_local(s.created_at, t.tz).date() for s in counted}
     for s in counted:
-        d = s.created_at.date()
+        d = local_day[s.id]
         if d in by_day:
             by_day[d] += s.total
     takings = [{"day": d, "total": by_day[d]} for d in days]
     stats["today"] = by_day[today]
-    stats["today_count"] = sum(1 for s in counted if s.created_at.date() == today)
+    stats["today_count"] = len({(s.order_id or -s.id) for s in counted if local_day[s.id] == today})
     latest = Sale.query.filter_by(tenant_id=tid()).order_by(Sale.created_at.desc()).limit(6).all()
     return render_template("ws/home.html", tenant=t, stats=stats, low=low, latest=latest, takings=takings,
                            peak=max((x["total"] for x in takings), default=Decimal(0)))
@@ -377,7 +379,8 @@ def products():
             p = Product(tenant_id=tid(), name=name, price=price, stock=0, method=method,
                         barcode=barcode, scent=scent, sku=f.get("sku", "").strip()[:60] or None,
                         photo=data or None, photo_mime=_sniff(data) if data else None,
-                        signature=sig, reorder_level=integer(f.get("reorder_level"), 5, MAX_QTY))
+                        signature=sig, reorder_level=integer(f.get("reorder_level"), 5, MAX_QTY),
+                        category=tidy_name(f.get("category"))[:60] or None)
             db.session.add(p)
             if stock:
                 add_stock(p, stock, "new")
@@ -392,8 +395,33 @@ def products():
     history = (StockMovement.query.filter_by(tenant_id=tid())
                .order_by(StockMovement.created_at.desc(), StockMovement.id.desc()).limit(15).all())
     unlinked = [p for p in items if not p.barcode]
+    categories = sorted({p.category for p in items if p.category}, key=str.lower)
     return render_template("ws/products.html", items=items, history=history, max_qty=MAX_QTY,
-                           duplicates=duplicate_groups(), unlinked=unlinked, undo_window=UNDO_WINDOW)
+                           duplicates=duplicate_groups(), unlinked=unlinked, undo_window=UNDO_WINDOW,
+                           categories=categories)
+
+
+@ws_bp.post("/products/<int:pid>/edit")
+@tenant_admin
+def product_edit(pid):
+    """Change a product's name, price, category, SKU or reorder level."""
+    p = Product.query.filter_by(id=pid, tenant_id=tid()).first_or_404()
+    f = request.form
+    name, price = tidy_name(f.get("name")), money(f.get("price"))
+    if not name or price is None:
+        flash("Product name and a valid price are required.", "error")
+        return redirect(url_for("ws.products"))
+    dup = product_by_name(name)
+    if dup and dup.id != p.id:
+        flash(f"{dup.name} is already registered. Choose another name.", "error")
+        return redirect(url_for("ws.products"))
+    p.name, p.price = name, price
+    p.category = tidy_name(f.get("category"))[:60] or None
+    p.sku = f.get("sku", "").strip()[:60] or None
+    p.reorder_level = integer(f.get("reorder_level"), p.reorder_level, MAX_QTY)
+    db.session.commit()
+    flash(f"{name} updated.", "ok")
+    return redirect(url_for("ws.products"))
 
 
 @ws_bp.post("/products/scan-in")
@@ -556,17 +584,18 @@ def ensure_barcode_index():
 
 IMPORT_MAX_ROWS = 2000
 IMPORT_MAX_BYTES = 1024 * 1024
-IMPORT_COLUMNS = ("name", "price", "quantity", "barcode", "sku", "reorder_level")
+IMPORT_COLUMNS = ("name", "price", "quantity", "barcode", "sku", "reorder_level", "category")
 HEADER_ALIASES = {
     "name": "name", "product": "name", "product name": "name", "item": "name", "description": "name",
     "price": "price", "selling price": "price", "unit price": "price",
     "quantity": "quantity", "qty": "quantity", "stock": "quantity", "units": "quantity", "count": "quantity",
     "barcode": "barcode", "ean": "barcode", "upc": "barcode", "code": "barcode",
     "sku": "sku", "reorder level": "reorder_level", "reorder_level": "reorder_level", "reorder": "reorder_level",
+    "category": "category", "department": "category", "group": "category", "type": "category",
 }
-IMPORT_TEMPLATE = ("name,price,quantity,barcode,sku,reorder_level\n"
-                   "Bath soap 250g,1.50,24,6001234567890,SOAP-250,6\n"
-                   "Cooking oil 2L,4.20,12,,OIL-2L,4\n")
+IMPORT_TEMPLATE = ("name,price,quantity,barcode,sku,reorder_level,category\n"
+                   "Bath soap 250g,1.50,24,6001234567890,SOAP-250,6,Toiletries\n"
+                   "Cooking oil 2L,4.20,12,,OIL-2L,4,Groceries\n")
 
 
 def _read_import_rows(text):
@@ -636,6 +665,8 @@ def import_stock(rows, update_prices=False):
                 by_barcode[bkey] = p
             if update_prices and price is not None:
                 p.price = price
+            if r.get("category") and not p.category:
+                p.category = tidy_name(r["category"])[:60]
             if qty:
                 add_stock(p, qty, "import")
                 summary["restocked"] += 1
@@ -646,7 +677,8 @@ def import_stock(rows, update_prices=False):
             continue
         p = Product(tenant_id=tid(), name=name, price=price, stock=0, barcode=barcode, sku=sku,
                     method="barcode" if barcode else "manual",
-                    reorder_level=integer(r.get("reorder_level"), 5, MAX_QTY))
+                    reorder_level=integer(r.get("reorder_level"), 5, MAX_QTY),
+                    category=tidy_name(r.get("category"))[:60] or None)
         db.session.add(p)
         if qty:
             add_stock(p, qty, "new", "Imported")
@@ -840,7 +872,7 @@ def sales():
     kind = request.args.get("type", "all")
     query = Sale.query.filter_by(tenant_id=tid())
     # Pending and refunded mobile-money sales are not debts, so they never count as credit.
-    owing = db.and_(Sale.paid < Sale.quantity * Sale.unit_price,
+    owing = db.and_(Sale.paid < Sale.total_sql(),
                     db.or_(Sale.payment_status.is_(None), Sale.payment_status.notin_(("pending", "refunded"))))
     if kind == "cash":
         query = query.filter(db.not_(owing))
@@ -877,6 +909,9 @@ def sales():
 @tenant_user
 def receipt(sid):
     s = Sale.query.filter_by(id=sid, tenant_id=tid()).first_or_404()
+    if s.order_id:  # rung up on the Register: one receipt for the whole order
+        return redirect(url_for("ws.order_receipt", oid=s.order_id, print=request.args.get("print"),
+                                back=request.args.get("back", "sales")))
     number = Sale.query.filter(Sale.tenant_id == tid(), Sale.id <= s.id).count()
     cashier = db.session.get(User, s.created_by) if s.created_by else None
     return render_template("ws/receipt.html", s=s, number=number, tenant=current_user.tenant,
@@ -889,6 +924,9 @@ def receipt(sid):
 def check_payment(sid):
     """Ask EcoCash what happened to a charge we could not confirm."""
     s = Sale.query.filter_by(id=sid, tenant_id=tid(), payment_method="ecocash", payment_status="pending").first_or_404()
+    if s.order_id:
+        from .pos import order_check
+        return order_check(s.order_id)
     try:
         res = ecocash().lookup(s.payment_phone, s.payment_correlator)
     except EcoCashUnknown:
@@ -919,6 +957,9 @@ def check_payment(sid):
 def refund(sid):
     """Refund an EcoCash payment to the customer's wallet and put the stock back."""
     s = Sale.query.filter_by(id=sid, tenant_id=tid(), payment_method="ecocash", payment_status="paid").first_or_404()
+    if s.order_id:
+        from .pos import order_refund
+        return order_refund(s.order_id)
     amount = s.paid
     try:
         res = ecocash().refund(s.payment_phone, amount, s.payment_ref, tid(), s.id,

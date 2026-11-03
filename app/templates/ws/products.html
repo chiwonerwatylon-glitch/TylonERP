@@ -67,6 +67,7 @@
       <h2 class="h5" id="ptitle">Register by photo</h2>
       <p class="text-body-secondary" id="pnote">Take a picture of the product, then enter how many you have.</p>
       <div class="row g-3 mb-3"><div class="col-sm-8"><label class="form-label" for="pname">Product name</label><input class="form-control" type="text" id="pname" name="name" required></div><div class="col-sm-4"><label class="form-label" for="pprice">Price</label><input class="form-control" type="text" id="pprice" name="price" inputmode="decimal" required></div></div>
+      <div class="row g-3 mb-3"><div class="col-sm-6"><label class="form-label" for="pcat">{{ _("Category") }} <span class="text-body-secondary fw-normal">({{ _("optional") }})</span></label><input class="form-control" type="text" id="pcat" name="category" maxlength="60" list="catlist" placeholder="{{ _("e.g. Drinks") }}"></div></div>
       <div class="mb-3 hidden" id="scentf"><label class="form-label" for="pscent">Scent</label><input class="form-control" type="text" id="pscent" name="scent" placeholder="For example, lavender and vanilla"></div>
       <div class="row g-3 mb-4"><div class="col-sm-6"><label class="form-label" for="pstock">How many</label><input class="form-control" type="text" id="pstock" name="stock" inputmode="numeric" value="1" required></div><div class="col-sm-6"><label class="form-label" for="preorder">Reorder level</label><input class="form-control" type="text" id="preorder" name="reorder_level" inputmode="numeric" value="5"></div></div>
       <button class="btn btn-primary" id="psave" disabled>Save product</button>
@@ -83,6 +84,7 @@
     <h2 class="h5">Add a product by typing</h2>
     <p class="text-body-secondary">No camera needed. Add a barcode or SKU if the product has one, so it can be scanned or imported later.</p>
     <div class="row g-3 mb-3"><div class="col-sm-8"><label class="form-label" for="mname">Product name</label><input class="form-control" type="text" id="mname" name="name" maxlength="150" required></div><div class="col-sm-4"><label class="form-label" for="mprice">Price</label><input class="form-control" type="text" id="mprice" name="price" inputmode="decimal" required></div></div>
+    <div class="row g-3 mb-3"><div class="col-sm-6"><label class="form-label" for="mcat">{{ _("Category") }} <span class="text-body-secondary fw-normal">({{ _("optional") }})</span></label><input class="form-control" type="text" id="mcat" name="category" maxlength="60" list="catlist" placeholder="{{ _("e.g. Drinks") }}"></div></div>
     <div class="row g-3 mb-3"><div class="col-sm-4"><label class="form-label" for="mstock">How many</label><input class="form-control" type="text" id="mstock" name="stock" inputmode="numeric" value="1" required></div><div class="col-sm-4"><label class="form-label" for="mreorder">Reorder level</label><input class="form-control" type="text" id="mreorder" name="reorder_level" inputmode="numeric" value="5"></div><div class="col-sm-4"><label class="form-label" for="msku">SKU <span class="text-body-secondary fw-normal">(optional)</span></label><input class="form-control" type="text" id="msku" name="sku" maxlength="60"></div></div>
     <div class="mb-4"><label class="form-label" for="mbarcode">Barcode <span class="text-body-secondary fw-normal">(optional)</span></label><input class="form-control mw-input" type="text" id="mbarcode" name="barcode" maxlength="64" inputmode="numeric"></div>
     <button class="btn btn-primary">Save product</button>
@@ -148,23 +150,40 @@
     {% if items|length > 5 %}<div class="input-group input-group-sm search-box"><span class="input-group-text">{{ ico('search') }}</span><input class="form-control" type="search" id="pfilter" placeholder="Find a product" aria-label="Find a product"></div>{% endif %}
   </div>
   <div class="table-responsive"><table class="table align-middle" id="ptable"><thead><tr><th>Product</th><th class="d-none d-md-table-cell">Recognised by</th><th class="text-end">Price</th><th>In stock</th><th>Add stock</th>{% if current_user.role=='admin' %}<th><span class="visually-hidden">Remove</span></th>{% endif %}</tr></thead><tbody>
-{% for p in items %}<tr data-q="{{ (p.name ~ ' ' ~ (p.barcode or '') ~ ' ' ~ (p.sku or ''))|lower }}">
-<td><div class="d-flex align-items-center">{% if p.photo %}<img class="thumb" src="{{ url_for('ws.product_photo', pid=p.id) }}" alt="">{% endif %}<div class="min-w-0"><span class="fw-semibold">{{ p.name }}</span>{% if p.sku %} <span class="text-body-secondary small">{{ p.sku }}</span>{% endif %}{% if p.scent %}<br><span class="text-body-secondary small">{{ p.scent }}</span>{% endif %}</div></div></td>
+{% for p in items %}<tr data-q="{{ (p.name ~ ' ' ~ (p.barcode or '') ~ ' ' ~ (p.sku or '') ~ ' ' ~ (p.category or ''))|lower }}">
+<td><div class="d-flex align-items-center">{% if p.photo %}<img class="thumb" src="{{ url_for('ws.product_photo', pid=p.id) }}" alt="">{% endif %}<div class="min-w-0"><span class="fw-semibold">{{ p.name }}</span>{% if p.sku %} <span class="text-body-secondary small">{{ p.sku }}</span>{% endif %}{% if p.category %} <span class="badge text-bg-secondary">{{ p.category }}</span>{% endif %}{% if p.scent %}<br><span class="text-body-secondary small">{{ p.scent }}</span>{% endif %}</div></div></td>
 <td class="d-none d-md-table-cell">{{ (p.method or 'photo')|capitalize }}{% if p.barcode %}<br><span class="text-body-secondary small">{{ p.barcode }}</span>{% endif %}</td>
-<td class="text-end">{{ '{:,.2f}'.format(p.price) }}</td>
+<td class="text-end">{{ ((p.price)|money) }}</td>
 <td class="text-nowrap"><span class="badge text-bg-{{ 'danger' if p.stock <= 0 else ('warning' if p.stock <= p.reorder_level else 'success') }}">{{ p.stock }}</span>{% if p.stock <= 0 %} <span class="small text-body-secondary">out</span>{% elif p.stock <= p.reorder_level %} <span class="small text-body-secondary">low</span>{% endif %}</td>
 <td><form method="post" action="{{ url_for('ws.restock', pid=p.id) }}" class="input-group input-group-sm w-qty"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input class="form-control" type="text" name="qty" inputmode="numeric" placeholder="Qty" aria-label="Units to add to {{ p.name }}"><button class="btn btn-outline-primary">Add</button></form></td>
-{% if current_user.role=='admin' %}<td class="text-end"><form method="post" action="{{ url_for('ws.product_delete', pid=p.id) }}" data-confirm="Remove {{ p.name }}?&#10;Its past sales stay in your records." data-confirm-ok="Remove" data-confirm-danger><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-link link-danger text-decoration-none">Remove</button></form></td>{% endif %}</tr>
+{% if current_user.role=='admin' %}<td class="text-end text-nowrap"><button type="button" class="btn btn-sm btn-link text-decoration-none" data-edit="{{ url_for('ws.product_edit', pid=p.id) }}" data-name="{{ p.name }}" data-price="{{ p.price }}" data-category="{{ p.category or '' }}" data-sku="{{ p.sku or '' }}" data-reorder="{{ p.reorder_level }}">{{ _("Edit") }}</button><form class="d-inline" method="post" action="{{ url_for('ws.product_delete', pid=p.id) }}" data-confirm="Remove {{ p.name }}?&#10;Its past sales stay in your records." data-confirm-ok="Remove" data-confirm-danger><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-link link-danger text-decoration-none">Remove</button></form></td>{% endif %}</tr>
 {% else %}<tr><td colspan="6" class="text-body-secondary">No products yet. Pick a way to register one above.</td></tr>{% endfor %}
 <tr class="hidden" id="pnone"><td colspan="6" class="text-body-secondary">No product matches that search.</td></tr>
 </tbody></table></div>
 </div>
 
+<datalist id="catlist">{% for c in categories %}<option value="{{ c }}">{% endfor %}</datalist>
+{% if current_user.role=='admin' %}
+<div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editTitle" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><form method="post" class="modal-content" id="editForm">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="modal-body">
+    <h2 class="h5 mb-3" id="editTitle">{{ _("Edit product") }}</h2>
+    <div class="mb-3"><label class="form-label" for="ename">{{ _("Product name") }}</label><input class="form-control" id="ename" name="name" maxlength="150" required></div>
+    <div class="row g-3 mb-3"><div class="col-6"><label class="form-label" for="eprice">{{ _("Price") }} <span class="text-body-secondary fw-normal">{{ biz.currency_code }}</span></label><input class="form-control" id="eprice" name="price" inputmode="decimal" required></div>
+    <div class="col-6"><label class="form-label" for="ecat">{{ _("Category") }}</label><input class="form-control" id="ecat" name="category" maxlength="60" list="catlist"></div></div>
+    <div class="row g-3"><div class="col-6"><label class="form-label" for="esku">SKU</label><input class="form-control" id="esku" name="sku" maxlength="60"></div>
+    <div class="col-6"><label class="form-label" for="ereorder">{{ _("Reorder level") }}</label><input class="form-control" id="ereorder" name="reorder_level" inputmode="numeric"></div></div>
+  </div>
+  <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{{ _("Cancel") }}</button><button class="btn btn-primary">{{ _("Save") }}</button></div>
+</form></div></div>
+<script>(()=>{const m=document.getElementById('editModal');if(!m)return;let modal;document.addEventListener('click',e=>{const b=e.target.closest('[data-edit]');if(!b)return;const f=document.getElementById('editForm');f.action=b.dataset.edit;f.dataset.busy='';f.querySelectorAll('.is-busy').forEach(x=>{x.disabled=false;x.classList.remove('is-busy')});[['ename','name'],['eprice','price'],['ecat','category'],['esku','sku'],['ereorder','reorder']].forEach(([i,k])=>document.getElementById(i).value=b.dataset[k]);modal=modal||new bootstrap.Modal(m);modal.show();});})();</script>
+{% endif %}
+
 {% if history %}
 <div class="card">
   <div class="card-head"><h2>Recent stock added</h2><span class="meta">Last {{ history|length }}</span></div>
   <div class="table-responsive"><table class="table align-middle"><thead><tr><th>When</th><th>Product</th><th class="text-end">Added</th><th>How</th><th>By</th><th><span class="visually-hidden">Undo</span></th></tr></thead><tbody>
-{% for m in history %}<tr><td class="text-nowrap text-body-secondary">{{ m.created_at.strftime('%d %b, %H:%M') }}</td><td class="fw-semibold">{{ m.product.name }}</td><td class="text-end"><span class="badge text-bg-success">+{{ m.quantity }}</span></td><td>{{ m.source_label }}{% if m.note %}<br><span class="text-body-secondary small">{{ m.note }}</span>{% endif %}</td><td class="text-body-secondary">{{ m.user.name if m.user else '' }}</td>
+{% for m in history %}<tr><td class="text-nowrap text-body-secondary">{{ m.created_at|dt('short') }}</td><td class="fw-semibold">{{ m.product.name }}</td><td class="text-end"><span class="badge text-bg-success">+{{ m.quantity }}</span></td><td>{{ m.source_label }}{% if m.note %}<br><span class="text-body-secondary small">{{ m.note }}</span>{% endif %}</td><td class="text-body-secondary">{{ m.user.name if m.user else '' }}</td>
 <td class="text-end">{% if m.source != 'new' and m.created_at > now - undo_window and (current_user.role == 'admin' or m.created_by == current_user.id) %}<form method="post" action="{{ url_for('ws.undo_stock', mid=m.id) }}" data-confirm="Take {{ m.quantity }} back off {{ m.product.name }}?&#10;Use this when stock was counted by mistake." data-confirm-ok="Undo"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-link text-decoration-none p-0">Undo</button></form>{% endif %}</td></tr>{% endfor %}
 </tbody></table></div>
 </div>

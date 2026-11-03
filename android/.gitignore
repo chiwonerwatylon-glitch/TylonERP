@@ -10,3 +10,6 @@ captures/
 *.aab
 *.jks
 *.keystore
+
+# The sideload signing key is committed on purpose (see README: Signing). Replace it with your own via secrets.
+!sideload.keystore

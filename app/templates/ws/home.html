@@ -1,66 +1,67 @@
 {% extends "shell.html" %}
 {% from "_ui.html" import ico %}
-{% block title %}Dashboard · {{ tenant.name }}{% endblock %}
+{% block title %}{{ _("Dashboard") }} · {{ tenant.name }}{% endblock %}
 {% block content %}
 {% set first = (current_user.name or '').split(' ')[0] %}
-<section class="till" aria-label="Takings">
+<section class="till" aria-label="{{ _('Takings') }}">
   <div class="till-grid">
     <div>
-      <p class="greet">Hello <b>{{ first or 'there' }}</b>. Here is how {{ tenant.name }} is doing.</p>
-      <div class="till-label">Takings, last 30 days</div>
-      <div class="till-figure">{{ '{:,.2f}'.format(stats.revenue) }}</div>
+      <p class="greet">{{ _('Hello {name}. Here is how {business} is doing.', name=first or '', business=tenant.name) }}</p>
+      <div class="till-label">{{ _("Takings, last 30 days") }}</div>
+      <div class="till-figure">{{ ((stats.revenue)|money) }}</div>
       <div class="till-sub">
-        <span>Today <b>{{ '{:,.2f}'.format(stats.today) }}</b> from {{ stats.today_count }} sale{{ '' if stats.today_count == 1 else 's' }}</span>
-        <span>Daily average <b>{{ '{:,.2f}'.format(stats.revenue / 30) }}</b></span>
+        <span>{{ _('Today') }} <b>{{ ((stats.today)|money) }}</b> · {{ stats.today_count }} {{ _('receipts') }}</span>
+        <span>{{ _('Daily average') }} <b>{{ ((stats.revenue / 30)|money) }}</b></span>
       </div>
       <div class="till-actions">
-        <a class="btn btn-till btn-lg d-inline-flex align-items-center gap-2" href="{{ url_for('ws.quick_sell') }}">{{ ico('bolt') }} Quick sell</a>
-        <a class="btn btn-ghost btn-lg d-inline-flex align-items-center gap-2" href="{{ url_for('ws.products') }}">{{ ico('plus') }} Add stock</a>
+        <a class="btn btn-till btn-lg d-inline-flex align-items-center gap-2" href="{{ url_for('ws.register') }}">{{ ico('card') }} {{ _('Open the Register') }}</a>
+        <a class="btn btn-ghost btn-lg d-inline-flex align-items-center gap-2" href="{{ url_for('ws.products') }}">{{ ico('plus') }} {{ _('Add stock') }}</a>
+        <a class="btn btn-ghost btn-lg d-inline-flex align-items-center gap-2" href="{{ url_for('ws.day_report') }}">{{ ico('chart') }} {{ _('Day report') }}</a>
       </div>
     </div>
     <div class="bars">
-      <div class="bars-head"><span>Daily takings, last 14 days</span><span>Best day {{ '{:,.2f}'.format(peak) }}</span></div>
+      <div class="bars-head"><span>{{ _('Daily takings, last 14 days') }}</span><span>{{ _('Best day') }} {{ ((peak)|money) }}</span></div>
       {% set n = takings|length %}
       <svg viewBox="0 0 {{ n * 20 }} 100" preserveAspectRatio="none" role="img" aria-label="Bar chart of daily takings for the last 14 days">
         {% for d in takings %}
         {% set h = ((d.total / peak * 96) if peak > 0 else 0)|float %}
-        <rect x="{{ loop.index0 * 20 + 3 }}" y="{{ 100 - (h if h > 2 else 2) }}" width="14" height="{{ h if h > 2 else 2 }}" rx="2.5" class="bar{{ ' today' if loop.last else (' empty' if d.total == 0 else '') }}"><title>{{ d.day.strftime('%a %d %b') }}: {{ '{:,.2f}'.format(d.total) }}</title></rect>
+        <rect x="{{ loop.index0 * 20 + 3 }}" y="{{ 100 - (h if h > 2 else 2) }}" width="14" height="{{ h if h > 2 else 2 }}" rx="2.5" class="bar{{ ' today' if loop.last else (' empty' if d.total == 0 else '') }}"><title>{{ d.day|day('EEE d MMM') }}: {{ ((d.total)|money) }}</title></rect>
         {% endfor %}
       </svg>
-      <div class="bars-axis"><span>{{ takings[0].day.strftime('%d %b') }}</span><span>Today</span></div>
+      <div class="bars-axis"><span>{{ takings[0].day|day('d MMM') }}</span><span>{{ _('Today') }}</span></div>
     </div>
   </div>
 </section>
 
 <div class="row g-3 mb-3">
-  <div class="col-6 col-lg-3"><a class="card stat h-100 text-decoration-none text-reset" href="{{ url_for('ws.debtors') }}"><div class="k">Owed by debtors</div><div class="v">{{ '{:,.2f}'.format(stats.owed) }}</div><div class="d">{{ stats.debtors }} client{{ '' if stats.debtors == 1 else 's' }} with a balance</div></a></div>
-  <div class="col-6 col-lg-3"><a class="card stat h-100 text-decoration-none text-reset" href="{{ url_for('ws.products') }}"><div class="k">Products</div><div class="v">{{ stats.products }}</div><div class="d">{{ stats.low }} at or below reorder level</div></a></div>
-  <div class="col-6 col-lg-3"><a class="card stat h-100 text-decoration-none text-reset" href="{{ url_for('ws.clients') }}"><div class="k">Clients</div><div class="v">{{ stats.clients }}</div><div class="d">Named customers on record</div></a></div>
-  <div class="col-6 col-lg-3"><div class="card stat h-100"><div class="k">Plan</div><div class="v">{{ tenant.plan_label }}</div><div class="d">Up to {{ tenant.max_users }} team members</div></div></div>
+  <div class="col-6 col-lg-3"><a class="card stat h-100 text-decoration-none text-reset" href="{{ url_for('ws.debtors') }}"><div class="k">{{ _("Owed by debtors") }}</div><div class="v">{{ ((stats.owed)|money) }}</div><div class="d">{{ _('{n} with a balance', n=stats.debtors) }}</div></a></div>
+  <div class="col-6 col-lg-3"><a class="card stat h-100 text-decoration-none text-reset" href="{{ url_for('ws.products') }}"><div class="k">{{ _("Products") }}</div><div class="v">{{ stats.products }}</div><div class="d">{{ _('{n} running low', n=stats.low) }}</div></a></div>
+  <div class="col-6 col-lg-3"><a class="card stat h-100 text-decoration-none text-reset" href="{{ url_for('ws.clients') }}"><div class="k">{{ _("Clients") }}</div><div class="v">{{ stats.clients }}</div><div class="d">{{ _('Named customers on record') }}</div></a></div>
+  <div class="col-6 col-lg-3"><div class="card stat h-100"><div class="k">{{ _("Currency") }}</div><div class="v">{{ biz.currency_code }}</div><div class="d">{{ biz.tax_label }} {{ biz.tax_percent|num }}%{% if biz.alt_currency %} · {{ biz.alt_currency }} @ {{ biz.alt_rate|num }}{% endif %}{% if current_user.role == "admin" %} · <a href="{{ url_for('ws.settings') }}">{{ _("Change") }}</a>{% endif %}</div></div></div>
 </div>
 
 <div class="row g-3">
   <div class="col-lg-6"><div class="card h-100">
-    <div class="card-head"><h2>Running low</h2><a class="small fw-semibold text-decoration-none" href="{{ url_for('ws.products') }}">Restock</a></div>
+    <div class="card-head"><h2>{{ _("Running low") }}</h2><a class="small fw-semibold text-decoration-none" href="{{ url_for('ws.products') }}">{{ _("Restock") }}</a></div>
     {% for p in low %}
     <div class="list-row">
       <div class="grow"><div class="t">{{ p.name }}</div><div class="s">{{ 'Out of stock' if p.stock <= 0 else p.stock ~ ' left' }}, reorder at {{ p.reorder_level }}</div></div>
       <div class="meter {{ 'out' if p.stock <= 0 }}" style="width:90px" aria-hidden="true"><span style="width:{{ [((p.stock / p.reorder_level * 100) if p.reorder_level else 0), 100]|min|round|int if p.stock > 0 else 100 }}%"></span></div>
     </div>
     {% else %}
-    <div class="empty"><b>Stock levels are healthy</b>Nothing is at or below its reorder level.</div>
+    <div class="empty"><b>{{ _('Stock levels are healthy') }}</b>{{ _('Nothing is at or below its reorder level.') }}</div>
     {% endfor %}
   </div></div>
   <div class="col-lg-6"><div class="card h-100">
-    <div class="card-head"><h2>Latest sales</h2><a class="small fw-semibold text-decoration-none" href="{{ url_for('ws.sales') }}">All sales</a></div>
+    <div class="card-head"><h2>{{ _("Latest sales") }}</h2><a class="small fw-semibold text-decoration-none" href="{{ url_for('ws.sales') }}">{{ _("All sales") }}</a></div>
     {% for s in latest %}
     <a class="list-row text-reset text-decoration-none" href="{{ url_for('ws.receipt', sid=s.id) }}">
       <span class="dot {{ 'paid' if s.kind == 'Cash' else ('none' if s.kind == 'Credit' else 'owed') }}" title="{{ s.kind }}"></span>
-      <div class="grow"><div class="t">{{ s.product_name }} × {{ s.quantity }}</div><div class="s">{{ s.client.name if s.client else 'Walk-in' }}, {{ s.method_label }}, {{ s.created_at.strftime('%d %b %H:%M') }}</div></div>
-      <div class="amt">{{ '{:,.2f}'.format(s.total) }}</div>
+      <div class="grow"><div class="t">{{ s.product_name }} × {{ s.quantity }}</div><div class="s">{{ s.client.name if s.client else _('Walk-in') }}, {{ _(s.method_label) }}, {{ (s.created_at|dt('short')) }}</div></div>
+      <div class="amt">{{ ((s.total)|money) }}</div>
     </a>
     {% else %}
-    <div class="empty"><b>No sales yet</b>Your first sale will appear here. Start with Quick sell.</div>
+    <div class="empty"><b>{{ _('No sales yet') }}</b>{{ _('Your first sale will appear here. Start on the Register.') }}</div>
     {% endfor %}
   </div></div>
 </div>

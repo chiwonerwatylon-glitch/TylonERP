@@ -34,18 +34,18 @@
   <div class="c m">{{ tenant.contact_email }}</div>
   <hr>
   <div class="r"><span>Receipt</span><span>#{{ '%06d'|format(number) }}</span></div>
-  <div class="r"><span>Date</span><span>{{ s.created_at.strftime('%d %b %Y %H:%M') }} UTC</span></div>
+  <div class="r"><span>Date</span><span>{{ (s.created_at|dt) }}</span></div>
   <div class="r"><span>Served by</span><span>{{ cashier.name if cashier else '-' }}</span></div>
   <div class="r"><span>Customer</span><span>{{ s.client.name if s.client else 'Walk-in' }}</span></div>
   <hr>
   <div>{{ s.product_name }}</div>
-  <div class="r m"><span>{{ s.quantity }} x {{ '%.2f'|format(s.unit_price) }}</span><span>{{ '%.2f'|format(s.total) }}</span></div>
+  <div class="r m"><span>{{ s.quantity }} x {{ ((s.unit_price)|money) }}</span><span>{{ ((s.total)|money) }}</span></div>
   <hr>
-  <div class="r t"><span>TOTAL</span><span>{{ '%.2f'|format(s.total) }}</span></div>
-  <div class="r"><span>Paid</span><span>{{ '%.2f'|format(s.paid) }}</span></div>
+  <div class="r t"><span>TOTAL</span><span>{{ ((s.total)|money) }}</span></div>
+  <div class="r"><span>Paid</span><span>{{ ((s.paid)|money) }}</span></div>
   {% if s.payment_method in ('ecocash','onemoney') %}<div class="r"><span>Method</span><span>{{ s.method_label }}</span></div>
   {% if s.payment_ref %}<div class="r m"><span>Ref</span><span>{{ s.payment_ref }}</span></div>{% endif %}{% endif %}
-  {% if s.balance > 0 %}<div class="r t"><span>BALANCE DUE</span><span>{{ '%.2f'|format(s.balance) }}</span></div>{% endif %}
+  {% if s.balance > 0 %}<div class="r t"><span>BALANCE DUE</span><span>{{ ((s.balance)|money) }}</span></div>{% endif %}
   <div class="c"><span class="stamp">{{ s.kind|upper }} SALE</span></div>
   <hr>
   <div class="c m">Thank you for your business</div>

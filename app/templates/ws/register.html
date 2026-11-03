@@ -1,0 +1,148 @@
+{% extends "shell.html" %}
+{% from "_ui.html" import ico %}
+{% block title %}{{ _("Register") }} · {{ tenant.name }}{% endblock %}
+{% block main_class %} main-register{% endblock %}
+{% block content %}
+<div class="reg" id="reg">
+  <section class="reg-shelf" aria-label="{{ _('Products') }}">
+    <div class="reg-search">
+      <div class="reg-field">
+        {{ ico('search') }}
+        <input type="search" id="q" autocomplete="off" spellcheck="false" placeholder="{{ _('Search, or scan a barcode') }}" aria-label="{{ _('Search, or scan a barcode') }}" enterkeyhint="search">
+        <kbd class="d-none d-lg-inline">F2</kbd>
+      </div>
+      <button class="btn btn-outline-secondary reg-cam" type="button" id="camBtn" aria-label="{{ _('Scan with camera') }}" title="{{ _('Scan with camera') }}">{{ ico('scan') }}</button>
+      <div class="dropdown">
+        <button class="btn btn-outline-secondary reg-cam position-relative" type="button" data-bs-toggle="dropdown" aria-label="{{ _('Held carts') }}" title="{{ _('Held carts') }}" id="heldBtn">{{ ico('wallet') }}<span class="reg-pip hidden" id="heldPip"></span></button>
+        <div class="dropdown-menu dropdown-menu-end menu-wide" id="heldMenu"></div>
+      </div>
+    </div>
+    <div class="cam reg-camview hidden" id="camWrap"><video id="v" muted playsinline></video><div class="reticle"></div><div class="hint" id="hint">{{ _('Hold the barcode in view') }}</div></div>
+    {% if categories %}
+    <div class="reg-cats" role="tablist" aria-label="{{ _('Categories') }}">
+      <button type="button" class="chip on" data-cat="">{{ _('All') }}</button>
+      {% for c in categories %}<button type="button" class="chip" data-cat="{{ c }}">{{ c }}</button>{% endfor %}
+    </div>
+    {% endif %}
+    <div class="reg-grid" id="grid" aria-live="polite"></div>
+    <div class="empty hidden" id="none"><b>{{ _('No products match') }}</b>{{ _('Try another word, or add the product on the Stock page.') }}</div>
+    {% if not products %}<div class="empty"><b>{{ _('No products yet') }}</b><a href="{{ url_for('ws.products') }}">{{ _('Add your first products on the Stock page') }}</a></div>{% endif %}
+  </section>
+
+  <aside class="reg-ticket" id="ticket" aria-label="{{ _('Cart') }}">
+    <div class="tk-head">
+      <div class="tk-title"><h1>{{ _('Ticket') }}</h1><span id="count" class="tk-count"></span></div>
+      <button class="btn btn-sm btn-link text-decoration-none tk-close d-lg-none" type="button" id="closeTicket">{{ _('Close') }}</button>
+    </div>
+    <div class="tk-cust">
+      <label class="visually-hidden" for="cust">{{ _('Customer') }}</label>
+      <select class="form-select form-select-sm" id="cust"><option value="">{{ _('Walk-in customer') }}</option>{% for c in clients %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}</select>
+    </div>
+    <ol class="tk-lines" id="lines"></ol>
+    <div class="tk-empty" id="tkEmpty">{{ _('Tap a product or scan a barcode to start a sale.') }}</div>
+    <div class="tk-foot">
+      <dl class="tk-sums">
+        <div><dt>{{ _('Subtotal') }}</dt><dd id="sub"></dd></div>
+        <div class="tk-disc"><dt><button type="button" class="btn btn-link p-0 text-decoration-none" id="discBtn">{{ _('Discount') }}</button></dt><dd id="disc"></dd></div>
+        {% if cfg.tax.rate|float > 0 %}<div class="tk-tax"><dt id="taxLabel"></dt><dd id="tax"></dd></div>{% endif %}
+      </dl>
+      <div class="tk-actions">
+        <button class="btn btn-outline-secondary" type="button" id="holdBtn">{{ _('Hold') }}</button>
+        <button class="btn btn-outline-secondary" type="button" id="clearBtn" aria-label="{{ _('Clear the cart') }}">{{ _('Clear') }}</button>
+      </div>
+      <button class="tk-charge" type="button" id="chargeBtn" disabled>
+        <span class="lbl">{{ _('Charge') }}</span><span class="amt" id="total"></span>
+        {% if cfg.alt %}<span class="alt" id="altTotal"></span>{% endif %}
+      </button>
+    </div>
+  </aside>
+
+  <button class="reg-bar d-lg-none" type="button" id="openTicket"><span id="barCount"></span><b id="barTotal"></b></button>
+</div>
+
+<!-- discount -->
+<div class="modal fade" id="discModal" tabindex="-1" aria-labelledby="discTitle" aria-hidden="true"><div class="modal-dialog modal-dialog-centered modal-sm"><div class="modal-content"><div class="modal-body">
+  <h2 class="h5 mb-3" id="discTitle">{{ _('Discount on this sale') }}</h2>
+  <div class="btn-group w-100 mb-3" role="group"><input type="radio" class="btn-check" name="dtype" id="dpct" value="pct" checked><label class="btn btn-outline-secondary" for="dpct">%</label><input type="radio" class="btn-check" name="dtype" id="damt" value="amt"><label class="btn btn-outline-secondary" for="damt">{{ cfg.symbol }}</label></div>
+  <input class="form-control form-control-lg" id="dval" inputmode="decimal" placeholder="0" aria-label="{{ _('Discount') }}">
+  <div class="d-flex gap-2 mt-2 flex-wrap">{% for v in (5, 10, 15, 20) %}<button type="button" class="btn btn-sm btn-outline-secondary" data-dq="{{ v }}">{{ v }}%</button>{% endfor %}</div>
+</div><div class="modal-footer"><button type="button" class="btn btn-outline-secondary" id="dclear">{{ _('Remove') }}</button><button type="button" class="btn btn-primary" id="dapply">{{ _('Apply') }}</button></div></div></div></div>
+
+<!-- payment -->
+<div class="modal fade" id="payModal" tabindex="-1" aria-labelledby="payTitle" aria-hidden="true"><div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down"><div class="modal-content pay">
+  <div class="modal-body" id="payBody">
+    <div class="pay-due"><span>{{ _('Amount due') }}</span><b id="payDue"></b>{% if cfg.alt %}<small id="payDueAlt"></small>{% endif %}</div>
+    <div class="pay-methods" role="radiogroup" aria-label="{{ _('Payment method') }}">
+      <button type="button" class="pm on" data-m="cash">{{ ico('wallet') }}<span>{{ _('Cash') }}</span></button>
+      <button type="button" class="pm" data-m="card">{{ ico('card') }}<span>{{ _('Card') }}</span></button>
+      <button type="button" class="pm" data-m="mobile">{{ ico('bolt') }}<span>{{ _('Mobile money') }}</span></button>
+      {% if ecocash_on %}<button type="button" class="pm" data-m="ecocash">{{ ico('bolt') }}<span>EcoCash</span></button>{% endif %}
+      <button type="button" class="pm" data-m="bank">{{ ico('building') }}<span>{{ _('Bank') }}</span></button>
+      <button type="button" class="pm" data-m="credit">{{ ico('users') }}<span>{{ _('On account') }}</span></button>
+    </div>
+
+    <div class="pp" data-p="cash">
+      {% if cfg.alt %}<div class="btn-group w-100 mb-2" role="group" aria-label="{{ _('Pay in') }}">
+        <input type="radio" class="btn-check" name="tcur" id="tbase" value="{{ cfg.currency }}" checked><label class="btn btn-outline-secondary" for="tbase">{{ cfg.currency }}</label>
+        <input type="radio" class="btn-check" name="tcur" id="talt" value="{{ cfg.alt.currency }}"><label class="btn btn-outline-secondary" for="talt">{{ cfg.alt.currency }}</label>
+      </div>{% endif %}
+      <label class="form-label" for="tendered">{{ _('Cash received') }}</label>
+      <input class="form-control form-control-lg pay-input" id="tendered" inputmode="decimal" autocomplete="off" placeholder="{{ _('Exact') }}">
+      <div class="pay-quick" id="quick"></div>
+      <div class="pay-change" id="changeBox"><span id="changeLbl">{{ _('Change due') }}</span><b id="change"></b></div>
+    </div>
+    <div class="pp hidden" data-p="card">
+      <label class="form-label" for="cardRef">{{ _('Card slip or approval code') }} <span class="text-body-secondary fw-normal">({{ _('optional') }})</span></label>
+      <input class="form-control" id="cardRef" maxlength="60" autocomplete="off">
+    </div>
+    <div class="pp hidden" data-p="mobile">
+      <div class="row g-2">
+        <div class="col-6"><label class="form-label" for="provider">{{ _('Provider') }}</label><select class="form-select" id="provider">{% for p in providers %}<option>{{ p }}</option>{% endfor %}</select></div>
+        <div class="col-6"><label class="form-label" for="mphone">{{ _('Customer number') }}</label><input class="form-control" id="mphone" type="tel" inputmode="tel" autocomplete="off"></div>
+      </div>
+      <label class="form-label mt-2" for="mref">{{ _('Transaction code') }}</label>
+      <input class="form-control" id="mref" maxlength="60" autocomplete="off">
+      <div class="form-text">{{ _('Check the payment has arrived on your phone before handing over the goods.') }}</div>
+    </div>
+    <div class="pp hidden" data-p="ecocash">
+      <label class="form-label" for="ephone">{{ _("Customer's EcoCash number") }}</label>
+      <input class="form-control form-control-lg" id="ephone" type="tel" inputmode="tel" placeholder="0771234567" autocomplete="off">
+      <div class="form-text">{{ _('The customer gets a PIN prompt on their phone. Keep this screen open until it confirms.') }}</div>
+    </div>
+    <div class="pp hidden" data-p="bank">
+      <label class="form-label" for="bref">{{ _('Transfer reference') }} <span class="text-body-secondary fw-normal">({{ _('optional') }})</span></label>
+      <input class="form-control" id="bref" maxlength="60" autocomplete="off">
+    </div>
+    <div class="pp hidden" data-p="credit">
+      <p class="small text-body-secondary mb-2">{{ _('The balance is added to the customer’s account and shows under Debtors.') }}</p>
+      <label class="form-label" for="ccust">{{ _('Customer') }}</label>
+      <select class="form-select mb-2" id="ccust"><option value="">{{ _('Choose a customer') }}</option>{% for c in clients %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}</select>
+      <label class="form-label" for="cpaid">{{ _('Paid now in cash') }} <span class="text-body-secondary fw-normal">({{ _('optional') }})</span></label>
+      <input class="form-control" id="cpaid" inputmode="decimal" placeholder="0" autocomplete="off">
+    </div>
+    <div id="payErr" class="alert alert-danger py-2 mt-3 mb-0 hidden" role="alert"></div>
+  </div>
+  <div class="modal-footer">
+    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{{ _('Back') }}</button>
+    <button type="button" class="btn btn-primary btn-lg flex-grow-1" id="payBtn">{{ _('Complete sale') }}</button>
+  </div>
+</div></div></div>
+
+<!-- done -->
+<div class="modal fade" id="doneModal" tabindex="-1" aria-labelledby="doneTitle" aria-hidden="true" data-bs-backdrop="static"><div class="modal-dialog modal-dialog-centered modal-sm"><div class="modal-content"><div class="modal-body text-center done">
+  <div class="done-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></div>
+  <h2 class="h5 mb-1" id="doneTitle">{{ _('Sale complete') }}</h2>
+  <p class="text-body-secondary mb-3" id="doneSub"></p>
+  <div class="done-change hidden" id="doneChangeBox"><span>{{ _('Change due') }}</span><b id="doneChange"></b></div>
+  <div class="alert alert-danger py-2 text-start hidden" id="doneWarn"></div>
+  <div class="d-grid gap-2">
+    <button type="button" class="btn btn-primary btn-lg" id="newSale">{{ _('New sale') }}</button>
+    <button type="button" class="btn btn-outline-secondary d-inline-flex align-items-center justify-content-center gap-2" id="printBtn">{{ ico('print') }} {{ _('Print receipt') }}</button>
+  </div>
+</div></div></div></div>
+
+<script type="application/json" id="regData">{{ {"products": products, "cfg": cfg, "t": strings, "slug": tenant.slug,
+  "urls": {"checkout": url_for('ws.checkout'), "match": url_for('ws.quick_match')}}|tojson }}</script>
+<script src="{{ url_for('static', filename='capture.js') }}"></script>
+<script src="{{ url_for('static', filename='register.js') }}"></script>
+{% endblock %}

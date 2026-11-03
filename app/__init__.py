@@ -11,7 +11,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from .config import load_settings
 from .security import init_security, limiter
 
-VERSION = "1.10.0"
+VERSION = "2.0.0"
 
 db = SQLAlchemy()
 login_manager = LoginManager()
@@ -98,8 +98,19 @@ def create_app(config=None):
     def remember_slug():
         g.slug = _slug_from_path()
 
-    from . import models
+    @app.before_request
+    def choose_language():
+        from flask_login import current_user
+
+        from .i18n import pick_language
+
+        user = current_user if current_user.is_authenticated else None
+        tenant = user.tenant if user and not user.is_superadmin else _tenant_for_theme_safe()
+        g.lang = pick_language(user, tenant)
+
+    from . import models, pos  # pos adds the Register, reports and settings to the workspace blueprint
     from .api import api_bp, mobile_bp
+    from .pwa import pwa_bp
     from .routes import admin_bp, auth_bp, main_bp
     from .workspace import public_bp, ws_bp
 
@@ -110,14 +121,23 @@ def create_app(config=None):
     app.register_blueprint(public_bp)
     app.register_blueprint(api_bp)
     app.register_blueprint(mobile_bp)
+    app.register_blueprint(pos.misc_bp)
+    app.register_blueprint(pwa_bp)
     csrf.exempt(api_bp)  # the phone authenticates with a bearer token, not a browser session
     csrf.exempt(mobile_bp)
     app.config["MAX_CONTENT_LENGTH"] = 4 * 1024 * 1024
 
     @app.context_processor
     def inject_globals():
+        from .i18n import current_language, is_rtl, translate
+        from .regional import LANGUAGES
+
         return {"app_version": VERSION, "plans": models.PLANS, "now": models.utcnow(),
-                "theme_style": _theme_style(), "auth_colors": _auth_colors()}
+                "theme_style": _theme_style(), "auth_colors": _auth_colors(),
+                "_": translate, "lang": current_language(), "rtl": is_rtl(), "languages": LANGUAGES,
+                "biz": _regional_tenant()}
+
+    _register_filters(app)
 
     _register_error_pages(app)
 
@@ -134,6 +154,55 @@ def create_app(config=None):
         _bootstrap(app)
 
     return app
+
+
+def _tenant_for_theme_safe():
+    try:
+        return _tenant_for_theme()
+    except Exception:  # a database hiccup must not stop the page from choosing a language
+        return None
+
+
+def _regional_tenant():
+    """The business whose currency, time zone and tax the page shows (None on admin pages)."""
+    from flask_login import current_user
+
+    if current_user.is_authenticated and not current_user.is_superadmin:
+        return current_user.tenant
+    return None
+
+
+def _register_filters(app):
+    from .regional import fmt_datetime, fmt_money, fmt_number
+
+    def biz():
+        return _regional_tenant()
+
+    @app.template_filter("money")
+    def money_filter(amount, currency=None, symbol=True):
+        t = biz()
+        code = currency or (t.currency_code if t else "USD")
+        return fmt_money(amount or 0, code, t.number_locale if t else "en_ZW", symbol_on=symbol)
+
+    @app.template_filter("dt")
+    def dt_filter(value, style="medium"):
+        t = biz()
+        return fmt_datetime(value, t.tz if t else "UTC", t.number_locale if t else "en_ZW", style)
+
+    @app.template_filter("day")
+    def day_filter(value, fmt="full"):
+        from babel.dates import format_date
+
+        t = biz()
+        try:
+            return format_date(value, format=fmt, locale=t.number_locale if t else "en_ZW")
+        except Exception:
+            return value.isoformat()
+
+    @app.template_filter("num")
+    def num_filter(value):
+        t = biz()
+        return fmt_number(value, t.number_locale if t else "en_ZW")
 
 
 ERROR_PAGES = {

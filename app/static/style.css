@@ -397,3 +397,140 @@ textarea.form-control{line-height:1.5}
   #tabs{flex-wrap:wrap}
   #tabs .nav-link{flex:1 1 30%;justify-content:center;padding:.5rem .4rem;font-size:.86rem}
 }
+
+/* ---------------------------------------------------------------- the Register
+   Left: the shelf, product tiles priced like shelf tags. Right: the ticket, a strip of till paper that grows
+   as the sale is rung up; its Charge button is the one loud thing on the screen. */
+.main-register .wrap{max-width:1500px}
+.main-register{padding-top:1rem}
+.reg{display:grid;grid-template-columns:minmax(0,1fr) 384px;gap:1.25rem;align-items:start}
+.reg-shelf{min-width:0}
+.reg-search{display:flex;gap:.5rem;align-items:center;position:sticky;top:calc(var(--nav-h) + .5rem);z-index:5;margin-bottom:.75rem}
+.reg-field{flex:1;display:flex;align-items:center;gap:.6rem;background:var(--surface);border:1px solid var(--line-strong);border-radius:12px;padding:0 .85rem;height:48px;box-shadow:var(--shadow-sm);transition:border-color .15s,box-shadow .15s}
+.reg-field:focus-within{border-color:var(--bs-primary);box-shadow:0 0 0 3px rgba(var(--bs-primary-rgb),.18)}
+.reg-field .ico{color:var(--muted)}
+.reg-field input{flex:1;border:0;background:none;outline:0;font-size:1rem;color:var(--ink);min-width:0;height:100%}
+.reg-field kbd{background:var(--bs-tertiary-bg);color:var(--muted);border:1px solid var(--line);font-size:.72rem;padding:.1rem .4rem;border-radius:6px}
+.reg-cam{height:48px;width:48px;padding:0;display:grid;place-items:center;border-radius:12px}
+.reg-cam.active{background:var(--bs-primary);color:var(--on-primary);border-color:var(--bs-primary)}
+.reg-pip{position:absolute;top:9px;right:9px;width:8px;height:8px;border-radius:50%;background:var(--maize);box-shadow:0 0 0 2px var(--surface)}
+.reg-camview{max-height:240px;margin-bottom:.75rem;aspect-ratio:16/7}
+.reg-cats{display:flex;gap:.4rem;overflow-x:auto;scrollbar-width:none;padding:.1rem 0 .85rem}
+.reg-cats::-webkit-scrollbar{display:none}
+.chip{flex:0 0 auto;border:1px solid var(--line-strong);background:var(--surface);color:var(--ink);border-radius:999px;padding:.38rem .9rem;font-weight:600;font-size:.86rem;white-space:nowrap}
+.chip:hover{border-color:color-mix(in srgb,var(--line-strong) 50%,var(--ink))}
+.chip.on{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.reg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:.65rem}
+.tile{position:relative;display:flex;flex-direction:column;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:.55rem .55rem .65rem;color:var(--ink);min-width:0;transition:border-color .12s,transform .08s,box-shadow .12s}
+.tile:hover{border-color:rgba(var(--bs-primary-rgb),.55);box-shadow:var(--shadow-md)}
+.tile:active{transform:scale(.97)}
+.tile.out{opacity:.5;cursor:not-allowed}
+.tile-pic{display:grid;place-items:center;aspect-ratio:3/2;border-radius:10px;overflow:hidden;margin-bottom:.55rem;font-family:var(--font-display);font-weight:700;font-size:1.5rem;letter-spacing:-.02em;
+  color:hsl(var(--h,150) 35% 28%);background:hsl(var(--h,150) 40% 90%)}
+[data-bs-theme=dark] .tile-pic{color:hsl(var(--h,150) 45% 80%);background:hsl(var(--h,150) 22% 20%)}
+.tile-pic img{width:100%;height:100%;object-fit:cover}
+.tile-name{font-weight:600;font-size:.88rem;line-height:1.25;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;min-height:2.5em;overflow-wrap:anywhere}
+.tile-foot{display:flex;align-items:baseline;justify-content:space-between;gap:.4rem;margin-top:.35rem}
+.tile-foot b{font-family:var(--font-display);font-weight:650;font-size:1rem;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.tile-foot small{color:var(--muted);font-size:.74rem;font-variant-numeric:tabular-nums}
+.tile-foot small.zero{color:var(--bad)}
+.tile-qty{position:absolute;top:.4rem;right:.4rem;min-width:26px;height:26px;padding:0 .4rem;border-radius:999px;display:grid;place-items:center;background:var(--bs-primary);color:var(--on-primary);font-weight:700;font-size:.8rem;box-shadow:0 2px 8px rgba(0,0,0,.18)}
+
+.reg-ticket{position:sticky;top:calc(var(--nav-h) + 1rem);height:calc(100vh - var(--nav-h) - 2rem);height:calc(100dvh - var(--nav-h) - 2rem);display:flex;flex-direction:column;
+  background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow-md);overflow:hidden}
+.tk-head{display:flex;align-items:center;justify-content:space-between;padding:1rem 1.1rem .5rem}
+.tk-title{display:flex;align-items:baseline;gap:.6rem}
+.tk-title h1{font-size:1.3rem;margin:0}
+.tk-count{color:var(--muted);font-size:.86rem;font-weight:600}
+.tk-cust{padding:0 1.1rem .7rem;border-bottom:1px dashed var(--line-strong)}
+.tk-lines{list-style:none;margin:0;padding:.25rem 0;overflow-y:auto;flex:1 1 auto;min-height:60px}
+.tk-line{padding:.6rem 1.1rem;border-bottom:1px solid var(--line);transition:background-color .6s}
+.tk-line.flash{background:rgba(var(--maize-rgb),.22);transition:none}
+.tk-row{display:flex;justify-content:space-between;align-items:center;gap:.75rem}
+.tk-name{font-weight:600;font-size:.92rem;line-height:1.3;min-width:0;overflow-wrap:anywhere}
+.tk-amt{font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:650}
+.tk-sub{margin-top:.35rem}
+.tk-each{font-size:.8rem;color:var(--muted);cursor:pointer;white-space:nowrap;font-variant-numeric:tabular-nums}
+.tk-each:hover{color:var(--ink)}
+.stepper{display:inline-flex;align-items:center;border:1px solid var(--line-strong);border-radius:9px;overflow:hidden;height:32px}
+.stepper button{width:32px;height:100%;border:0;background:var(--bs-tertiary-bg);color:var(--ink);font-size:1.05rem;font-weight:600;line-height:1}
+.stepper button:hover{background:var(--line)}
+.stepper input{width:44px;height:100%;border:0;text-align:center;background:var(--surface);color:var(--ink);font-weight:650;font-variant-numeric:tabular-nums;outline:0}
+.tk-empty{color:var(--muted);text-align:center;padding:2rem 1.5rem;font-size:.9rem;flex:1 1 auto}
+.tk-foot{border-top:1px dashed var(--line-strong);padding:.75rem 1.1rem 1.1rem;background:linear-gradient(var(--bs-tertiary-bg),var(--surface))}
+.tk-sums{margin:0 0 .6rem;font-size:.9rem}
+.tk-sums>div{display:flex;justify-content:space-between;padding:.12rem 0}
+.tk-sums dt{font-weight:500;color:var(--muted)}
+.tk-sums dd{margin:0;font-variant-numeric:tabular-nums}
+.tk-disc dd{color:var(--good);font-weight:600}
+.tk-disc dt .btn{font-size:.9rem;font-weight:600}
+.tk-actions{display:flex;gap:.5rem;margin-bottom:.6rem}
+.tk-actions .btn{flex:1;--bs-btn-padding-y:.4rem;--bs-btn-font-size:.88rem}
+.tk-charge{width:100%;border:0;border-radius:14px;padding:.95rem 1.15rem;display:grid;grid-template-columns:auto 1fr;align-items:center;gap:.1rem 1rem;text-align:left;
+  background:var(--bs-primary);color:var(--on-primary);box-shadow:0 1px 0 rgba(255,255,255,.14) inset,0 10px 24px -12px rgba(var(--bs-primary-rgb),.8);transition:background-color .15s,transform .08s}
+.tk-charge:hover:not(:disabled){background:color-mix(in srgb,var(--bs-primary) 86%,#000)}
+.tk-charge:active:not(:disabled){transform:translateY(1px)}
+.tk-charge:disabled{opacity:.45;box-shadow:none}
+.tk-charge .lbl{font-weight:650;font-size:1.02rem}
+.tk-charge .amt{font-family:var(--font-display);font-size:1.75rem;font-weight:700;letter-spacing:-.03em;text-align:right;font-variant-numeric:tabular-nums;line-height:1.1;overflow-wrap:anywhere}
+.tk-charge .alt{grid-column:1/-1;text-align:right;font-size:.82rem;opacity:.8;font-variant-numeric:tabular-nums}
+.reg-bar{position:fixed;left:.75rem;right:.75rem;bottom:calc(68px + env(safe-area-inset-bottom));z-index:1029;display:flex;justify-content:space-between;align-items:center;gap:1rem;
+  border:0;border-radius:14px;padding:.85rem 1.1rem;background:var(--bs-primary);color:var(--on-primary);font-weight:600;box-shadow:0 12px 28px -10px rgba(0,0,0,.45)}
+.reg-bar b{font-family:var(--font-display);font-size:1.2rem;letter-spacing:-.02em}
+.reg-toast{position:fixed;left:50%;bottom:calc(140px + env(safe-area-inset-bottom));transform:translate(-50%,20px);opacity:0;pointer-events:none;z-index:1090;
+  background:var(--ink);color:var(--surface);padding:.55rem 1rem;border-radius:999px;font-weight:600;font-size:.9rem;transition:opacity .2s,transform .2s;max-width:90vw;text-align:center}
+.reg-toast.bad{background:var(--bad);color:#fff}
+.reg-toast.show{opacity:1;transform:translate(-50%,0)}
+@media(min-width:992px){.reg-toast{bottom:2rem}}
+@media(max-width:991.98px){
+  .reg{grid-template-columns:1fr}
+  .main-register{padding-bottom:9rem}
+  .reg-ticket{position:fixed;inset:auto 0 0 0;top:auto;height:auto;max-height:88dvh;z-index:1040;border-radius:20px 20px 0 0;transform:translateY(105%);transition:transform .25s ease;padding-bottom:env(safe-area-inset-bottom)}
+  body.ticket-open .reg-ticket{transform:none}
+  body.ticket-open::after{content:"";position:fixed;inset:0;background:rgba(11,16,14,.45);z-index:1035}
+  .reg-grid{grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:.5rem}
+  .tile-pic{aspect-ratio:16/10;font-size:1.25rem}
+}
+
+/* payment sheet */
+.pay .modal-body{padding-bottom:.5rem}
+.pay-due{display:flex;flex-direction:column;align-items:center;padding:.4rem 0 1rem}
+.pay-due span{color:var(--muted);font-size:.86rem;font-weight:600}
+.pay-due b{font-family:var(--font-display);font-size:2.6rem;font-weight:700;letter-spacing:-.035em;line-height:1.1;font-variant-numeric:tabular-nums}
+.pay-due small{color:var(--muted);font-variant-numeric:tabular-nums}
+.pay-methods{display:grid;grid-template-columns:repeat(3,1fr);gap:.45rem;margin-bottom:1rem}
+.pm{display:flex;flex-direction:column;align-items:center;gap:.25rem;padding:.65rem .3rem;border:1px solid var(--line-strong);border-radius:12px;background:var(--surface);color:var(--ink);font-weight:600;font-size:.82rem}
+.pm.on{border-color:var(--bs-primary);background:rgba(var(--bs-primary-rgb),.08);color:var(--bs-primary);box-shadow:0 0 0 1px var(--bs-primary) inset}
+.pay-input{font-family:var(--font-display);font-size:1.6rem!important;font-weight:650;text-align:center;font-variant-numeric:tabular-nums}
+.pay-quick{display:flex;flex-wrap:wrap;gap:.4rem;margin:.6rem 0}
+.pay-quick .btn{flex:1 1 auto;--bs-btn-padding-y:.45rem;--bs-btn-font-size:.88rem}
+.pay-change{display:flex;justify-content:space-between;align-items:baseline;padding:.7rem .9rem;border-radius:12px;background:var(--bs-tertiary-bg);font-weight:600}
+.pay-change b{font-family:var(--font-display);font-size:1.45rem;font-variant-numeric:tabular-nums}
+.pay-change.ok{background:rgba(var(--good-rgb),.1);color:var(--good)}
+.pay-change.short{background:rgba(var(--bad-rgb),.08);color:var(--bad)}
+.done-mark{width:64px;height:64px;margin:.5rem auto 1rem;border-radius:50%;display:grid;place-items:center;background:rgba(var(--good-rgb),.14);color:var(--good)}
+.done-mark svg{width:34px;height:34px;stroke-dasharray:24;stroke-dashoffset:24;animation:tick .45s .1s ease-out forwards}
+@keyframes tick{to{stroke-dashoffset:0}}
+.done-change{background:rgba(var(--maize-rgb),.2);border-radius:12px;padding:.75rem;margin-bottom:1rem}
+.done-change span{display:block;font-size:.84rem;font-weight:600;color:var(--maize-ink)}
+.done-change b{font-family:var(--font-display);font-size:2rem;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+
+/* day report */
+.rep-hours{display:flex;align-items:flex-end;gap:3px;height:110px;padding:0 1.25rem 0}
+.rep-hours span{flex:1;background:rgba(var(--bs-primary-rgb),.25);border-radius:3px 3px 0 0;min-height:2px}
+.rep-hours span.on{background:var(--bs-primary)}
+.rep-axis{display:flex;justify-content:space-between;padding:.35rem 1.25rem 1rem;font-size:.74rem;color:var(--muted)}
+@media print{.no-print{display:none!important}.card{box-shadow:none;break-inside:avoid}}
+
+/* language menu, settings */
+.lang-menu .dropdown-item[aria-current=true]{font-weight:700;color:var(--bs-primary)}
+.settings-sample{font-family:var(--font-display);font-size:1.35rem;font-weight:650;letter-spacing:-.02em}
+
+/* right-to-left languages */
+[dir=rtl] .sidebar{left:auto;right:0}
+@media(min-width:992px){[dir=rtl] .appbar,[dir=rtl] .main{margin-left:0;margin-right:var(--side-w)}}
+[dir=rtl] .sidebar .nav-link.active::before{left:auto;right:-.75rem;border-radius:3px 0 0 3px}
+[dir=rtl] .sidebar button.nav-link,[dir=rtl] .tile,[dir=rtl] .tk-charge,[dir=rtl] .cand{text-align:right}
+[dir=rtl] .tk-charge .amt,[dir=rtl] .tk-charge .alt{text-align:left}
+[dir=rtl] .tile-qty{right:auto;left:.4rem}
+[dir=rtl] .alert-dismissible{padding-right:1rem;padding-left:3rem}

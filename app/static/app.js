@@ -12,6 +12,11 @@
     document.documentElement.classList.add('in-app');
   }
 
+  // Installable app: register the service worker (static files only; see app/pwa.py). Not inside the phone apps.
+  if ('serviceWorker' in navigator && !window.TylonAndroid && !(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.printUrl)) {
+    window.addEventListener('load', function () { navigator.serviceWorker.register('/sw.js', {scope: '/'}).catch(function () {}); });
+  }
+
   function lock(form, submitter) {
     // After the browser has collected the form's values, so a named submit button still sends its value.
     setTimeout(function () { lockNow(form, submitter); }, 0);

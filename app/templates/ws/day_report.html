@@ -1,0 +1,52 @@
+{% extends "shell.html" %}
+{% from "_ui.html" import ico %}
+{% block title %}{{ _("Day report") }} · {{ tenant.name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>{{ _("Day report") }}</h1><p class="sub">{{ day|day }} · {{ tenant.tz.replace('_', ' ') }}. {{ _("What came in, how it was paid and what sold, for closing the till.") }}</p></div>
+  <div class="actions no-print">
+    <a class="btn btn-outline-secondary" href="{{ url_for('ws.day_report', date=prev.isoformat()) }}" aria-label="{{ _('Previous day') }}">‹</a>
+    <form class="d-flex" method="get"><input class="form-control" type="date" name="date" value="{{ day.isoformat() }}" max="{{ today.isoformat() }}" onchange="this.form.submit()" aria-label="{{ _('Day') }}"></form>
+    {% if next %}<a class="btn btn-outline-secondary" href="{{ url_for('ws.day_report', date=next.isoformat()) }}" aria-label="{{ _('Next day') }}">›</a>{% endif %}
+    <button class="btn btn-primary d-inline-flex align-items-center gap-2" type="button" onclick="window.print()">{{ ico('print') }} {{ _("Print") }}</button>
+  </div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-6 col-lg-3"><div class="card stat h-100"><div class="k">{{ _("Sales") }}</div><div class="v">{{ summary.gross|money }}</div><div class="d">{{ summary.receipts }} {{ _("receipts") }}, {{ summary.units }} {{ _("Items")|lower }}</div></div></div>
+  <div class="col-6 col-lg-3"><div class="card stat h-100"><div class="k">{{ _("Received") }}</div><div class="v">{{ summary.received|money }}</div><div class="d">{{ _("Average sale") }} {{ summary.average|money }}</div></div></div>
+  <div class="col-6 col-lg-3"><div class="card stat h-100"><div class="k">{{ _("On credit") }}</div><div class="v{{ ' text-danger' if summary.credit > 0 }}">{{ summary.credit|money }}</div><div class="d">{{ _("Still owed from today's sales") }}</div></div></div>
+  <div class="col-6 col-lg-3"><div class="card stat h-100"><div class="k">{{ tenant.tax_label }}</div><div class="v">{{ summary.tax|money }}</div><div class="d">{{ _("Discounts") }} {{ summary.discount|money }}</div></div></div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-5"><div class="card h-100">
+    <div class="card-head"><h2>{{ _("Payments by method") }}</h2><span class="meta">{{ _("Count this against the drawer") }}</span></div>
+    {% for m, amt in methods %}
+    <div class="list-row"><div class="grow"><div class="t">{{ _(labels.get(m, m|capitalize)) }}</div></div><div class="amt">{{ amt|money }}</div></div>
+    {% else %}<div class="empty"><b>{{ _("No sales on this day") }}</b>{{ _("Pick another day above.") }}</div>{% endfor %}
+    {% if summary.refund_count %}<div class="list-row"><div class="grow"><div class="t text-danger">{{ _("Refunds") }}</div><div class="s">{{ summary.refund_count }}</div></div><div class="amt text-danger">−{{ summary.refunds|money }}</div></div>{% endif %}
+    {% if summary.pending %}<div class="list-row"><div class="grow"><div class="t">{{ _("EcoCash payments still pending") }}</div><div class="s"><a href="{{ url_for('ws.sales') }}">{{ _("Check them on the Sales page") }}</a></div></div><div class="amt">{{ summary.pending }}</div></div>{% endif %}
+  </div></div>
+  <div class="col-lg-7"><div class="card h-100">
+    <div class="card-head"><h2>{{ _("Sales by hour") }}</h2></div>
+    <div class="rep-hours pt-3" role="img" aria-label="{{ _('Sales by hour') }}">{% for h, v in hours %}<span class="{{ 'on' if v > 0 }}" style="height:{{ ((v / peak * 100) if peak > 0 else 0)|round|int }}%" title="{{ '%02d'|format(h) }}:00 · {{ v|money }}"></span>{% endfor %}</div>
+    <div class="rep-axis"><span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>23:00</span></div>
+  </div></div>
+
+  <div class="col-lg-7"><div class="card h-100">
+    <div class="card-head"><h2>{{ _("Best sellers") }}</h2></div>
+    <div class="table-responsive"><table class="table align-middle"><thead><tr><th>{{ _("Product") }}</th><th class="text-end">{{ _("Qty") }}</th><th class="text-end">{{ _("Sales") }}</th></tr></thead><tbody>
+    {% for name, v in products %}<tr><td class="fw-semibold">{{ name }}</td><td class="text-end">{{ v[0] }}</td><td class="text-end">{{ v[1]|money }}</td></tr>
+    {% else %}<tr><td colspan="3" class="text-body-secondary">{{ _("No sales on this day") }}</td></tr>{% endfor %}
+    </tbody></table></div>
+  </div></div>
+  <div class="col-lg-5"><div class="card h-100">
+    <div class="card-head"><h2>{{ _("By cashier") }}</h2></div>
+    {% for name, n, amt in cashiers %}
+    <div class="list-row"><div class="grow"><div class="t">{{ name }}</div><div class="s">{{ n }} {{ _("lines") }}</div></div><div class="amt">{{ amt|money }}</div></div>
+    {% else %}<div class="empty">{{ _("No sales on this day") }}</div>{% endfor %}
+  </div></div>
+</div>
+<p class="text-body-secondary small mt-3">{{ _("Printed") }} {{ generated|dt }}</p>
+{% endblock %}

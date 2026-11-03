@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}{{ _("No connection") }} · TylonERP{% endblock %}
+{% block body %}
+<div class="err"><div class="err-card">
+  <div class="err-code" aria-hidden="true">•••</div>
+  <h1>{{ _("No connection") }}</h1>
+  <p>{{ _("TylonERP needs the internet to sell and save. Your cart on the Register is kept on this device. Reconnect and try again.") }}</p>
+  <button class="btn btn-primary btn-lg" type="button" onclick="location.reload()">{{ _("Try again") }}</button>
+</div></div>
+{% endblock %}

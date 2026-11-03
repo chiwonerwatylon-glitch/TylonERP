@@ -1,7 +1,9 @@
 # TylonERP
 
-Multi-tenant ERP built with Flask: stock (barcode, photo or scent recognition), quick sell, sales and receipts,
-clients and debtors, per-tenant branding, and a system administrator console.
+Multi-tenant point of sale and ERP built with Flask: a cart-based **Register**, stock (barcode, photo or scent
+recognition), quick sell, sales and receipts, clients and debtors, a day report, per-tenant branding, and a system
+administrator console. Every business sells in its own currency, tax and time zone, in eight screen languages,
+and the app installs on iPhone and Android phones.
 
 ## Run locally
 
@@ -95,6 +97,63 @@ A barcode never creates a second product, however it reaches the app (`app/barco
 - Each scan carries an id, so a resent or double-tapped request counts once. Every counted line has **Undo**.
 - **Possible duplicates** on the Stock page lists products that share a name or barcode. An admin can merge them:
   stock, sales and stock history move into the product kept.
+
+## The Register
+
+**Register** (in the sidebar, and the default screen of the installed app) is a modern till:
+
+- Product tiles grouped by category, a search box that also takes a USB/Bluetooth barcode scanner (it types and
+  presses Enter), and camera scanning. Keyboard: `F2` or `/` to search, `F9` or `Ctrl+Enter` to charge.
+- A ticket with quantity steppers, line discounts (tap the unit price), a sale discount (% or amount), sales tax
+  and the customer. **Hold** parks a sale and lets you serve the next customer; held sales are kept on the device.
+- **Charge** takes cash (quick amounts, change worked out, in the main or the second currency), card, mobile money
+  (M-Pesa, MTN MoMo, Airtel Money, OneMoney, InnBucks and others, with the transaction code), EcoCash through its
+  API, bank transfer, or on account (credit, with an optional part payment).
+- The server prices every checkout again from the database (`price_order` in `app/pos.py`), so totals cannot be
+  tampered with in the browser. Each checkout carries an id, so a double tap or a retried request records once.
+- One receipt per sale with tax (included or added), discounts, change and the second-currency total. Each line is
+  still a `Sale`, so Sales, Debtors and the phone sync work as before.
+
+**Day report** shows a day's takings in the business's time zone: payments by method (to count the drawer), tax,
+discounts, credit given, refunds, sales by hour, best sellers and takings per cashier.
+
+## Countries, currencies and languages
+
+An admin opens **Business settings** and picks the country; that fills in the currency, time zone, number format and
+a suggested sales tax (VAT, GST, IVA, TVA…) for 40+ countries, all editable. Options:
+
+- **Currency** (any ISO 4217 code) and an optional **second currency** with its exchange rate, for example USD and
+  ZiG in Zimbabwe. The Register shows both totals and gives change in the currency the customer paid in.
+- **Tax** included in shelf prices or added at the till, with the tax number printed on receipts.
+- **Number and date format** (`en_ZW`, `pt_MZ`, `fr_SN`, `ar_AE`…), formatted with Babel/CLDR on the server and
+  `Intl` in the browser. Days on the dashboard and the day report follow the business's **time zone**.
+- **Screen language**: English, Français, Português, Español, Kiswahili, chiShona, العربية (right to left) and 中文.
+  Each member can choose their own from the language menu in the top bar; it is saved on their account.
+  Catalogs live in `app/translations/<code>.json` (English text → translation). A missing string falls back to
+  English. The chiShona catalog covers the main screens; corrections from native speakers are welcome.
+
+Each business has one currency for its books. A company trading in several countries registers each country's shop
+as its own business.
+
+## Install on phones
+
+- **Any phone, no app store**: open the business's sign-in link in Safari (iPhone: Share › Add to Home Screen) or
+  Chrome (Android: Install app). It opens full screen from its own icon (`app/pwa.py`).
+- **Android APK** and **iPhone/iPad app**: the *Phone apps* workflow (`.github/workflows/apps.yml`) builds both on
+  every change to `android/` or `ios/` and publishes them on the repository's
+  [Releases page](../../releases/latest).
+
+### Signing
+
+The APK is signed with `android/sideload.keystore` unless you add your own key as repository secrets
+(`ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`). The
+committed key keeps updates installing over each other, but anyone with this repository can sign with it: set your
+own before giving the app to people outside your business. Changing the key later means uninstalling the old app
+once (upload pending offline work first).
+
+The iOS build is unsigned. Install it with [Sideloadly](https://sideloadly.io) or AltStore and your Apple ID (a free
+Apple ID must re-sign it every 7 days), or join the Apple Developer Program to distribute it through TestFlight.
+`ios/` is a small SwiftUI + WKWebView app generated with XcodeGen (`cd ios && xcodegen generate`).
 
 ## Android app
 

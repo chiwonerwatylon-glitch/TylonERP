@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% from "_ui.html" import ico %}
+{% block title %}{{ _("Receipt") }} {{ '%06d'|format(number) }} · {{ tenant.name }}{% endblock %}
+{% block body %}
+<style>
+  /* The page follows the app theme; the slip itself stays paper-white, as it prints. */
+  .rc-page{min-height:100vh;background:var(--page-bg);padding:1.25rem 1rem 2.5rem}
+  .sheet{width:80mm;max-width:100%;margin:0 auto;background:#fff;color:#111;padding:6mm 5mm 5mm;border-radius:4px;
+    box-shadow:0 1px 2px rgba(0,0,0,.08),0 18px 40px -18px rgba(0,0,0,.35);
+    font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-variant-numeric:tabular-nums}
+  .sheet h1{font:700 17px/1.2 var(--font-display);text-align:center;margin:0 0 2px;letter-spacing:-.01em;color:#111}
+  .sheet .c{text-align:center}.sheet .m{color:#555}
+  .sheet hr{border:0;border-top:1px dashed #999;margin:8px 0;opacity:1}
+  .sheet .r{display:flex;justify-content:space-between;gap:8px}
+  .sheet .r span:last-child{text-align:end;white-space:nowrap}
+  .sheet .t{font-weight:700;font-size:14px}
+  .sheet .stamp{display:inline-block;border:1.5px solid #111;padding:1px 8px;font-weight:700;letter-spacing:.08em;margin:6px 0}
+  .sheet .logo-r{display:block;max-height:48px;max-width:60%;margin:0 auto 6px;object-fit:contain}
+  .rc-bar{width:80mm;max-width:100%;margin:0 auto 1rem;display:flex;gap:.5rem}
+  .rc-bar .btn{flex:1;white-space:nowrap}
+  @media print{
+    @page{size:80mm auto;margin:0}
+    .rc-page{background:#fff;padding:0;min-height:0}
+    .sheet{box-shadow:none;margin:0;width:80mm;padding:4mm;border-radius:0}
+    .rc-bar{display:none}
+  }
+</style>
+{% set cur = o.currency %}
+{% set b = tenant.branding %}
+<div class="rc-page">
+<div class="rc-bar"><button class="btn btn-primary d-inline-flex align-items-center justify-content-center gap-2" type="button" onclick="window.print()">{{ ico('print') }} {{ _("Print") }}</button><a class="btn btn-outline-secondary" href="{{ url_for('ws.register') if back=='register' else url_for('ws.sales') }}">{{ _("New sale") if back=='register' else _("Back to sales") }}</a></div>
+<div class="sheet">
+  {% if b and b.logo %}<img class="logo-r" src="{{ url_for('tenant_public.login_logo', slug=tenant.slug) }}" alt="">{% endif %}
+  <h1>{{ tenant.name }}</h1>
+  {% if tenant.address %}<div class="c m">{{ tenant.address }}</div>{% endif %}
+  {% if tenant.phone %}<div class="c m">{{ tenant.phone }}</div>{% endif %}
+  <div class="c m">{{ tenant.contact_email }}</div>
+  {% if tenant.tax_number %}<div class="c m">{{ o.tax_name or tenant.tax_label }} {{ _("No.") }} {{ tenant.tax_number }}</div>{% endif %}
+  <hr>
+  {% if o.tax and o.tax > 0 %}<div class="c t">{{ _("TAX INVOICE") }}</div>{% endif %}
+  <div class="r"><span>{{ _("Receipt") }}</span><span>#{{ '%06d'|format(number) }}</span></div>
+  <div class="r"><span>{{ _("Date") }}</span><span>{{ o.created_at|dt }}</span></div>
+  <div class="r"><span>{{ _("Served by") }}</span><span>{{ o.cashier.name if o.cashier else '-' }}</span></div>
+  <div class="r"><span>{{ _("Customer") }}</span><span>{{ o.client.name if o.client else _("Walk-in") }}</span></div>
+  <hr>
+  {% for s in o.lines %}
+  <div>{{ s.product_name }}</div>
+  <div class="r m"><span>{{ s.quantity }} x {{ s.unit_price|money(cur, False) }}</span><span>{{ (s.quantity * s.unit_price)|money(cur, False) }}</span></div>
+  {% endfor %}
+  <hr>
+  <div class="r"><span>{{ _("Subtotal") }}</span><span>{{ o.subtotal|money(cur) }}</span></div>
+  {% if o.discount > 0 %}<div class="r"><span>{{ _("Discount") }}</span><span>-{{ o.discount|money(cur) }}</span></div>{% endif %}
+  {% if o.tax > 0 and not o.tax_inclusive %}<div class="r"><span>{{ o.tax_name }} {{ o.tax_rate|num }}%</span><span>{{ o.tax|money(cur) }}</span></div>{% endif %}
+  <div class="r t"><span>{{ _("TOTAL") }}</span><span>{{ o.total|money(cur) }}</span></div>
+  {% if o.tax > 0 and o.tax_inclusive %}<div class="r m"><span>{{ _("includes") }} {{ o.tax_name }} {{ o.tax_rate|num }}%</span><span>{{ o.tax|money(cur) }}</span></div>{% endif %}
+  {% if alt_total is not none %}<div class="r m"><span>{{ _("Total in {cur}", cur=o.tender_currency) }} @ {{ o.rate|num }}</span><span>{{ alt_total|money(o.tender_currency) }}</span></div>{% endif %}
+  <hr>
+  <div class="r"><span>{{ _("Paid by") }}</span><span>{{ _(o.method_label.split(' · ')[0]) }}{{ ' · ' ~ o.payment_provider if o.payment_provider }}</span></div>
+  {% if o.tendered is not none %}<div class="r"><span>{{ _("Cash received") }}</span><span>{{ o.tendered|money(o.tender_currency or cur) }}</span></div>{% endif %}
+  {% if o.change %}<div class="r t"><span>{{ _("Change") }}</span><span>{{ o.change|money(o.tender_currency or cur) }}</span></div>{% endif %}
+  <div class="r"><span>{{ _("Paid") }}</span><span>{{ o.paid|money(cur) }}</span></div>
+  {% if o.payment_ref %}<div class="r m"><span>{{ _("Ref") }}</span><span>{{ o.payment_ref }}</span></div>{% endif %}
+  {% if o.payment_status == 'pending' %}<div class="c"><span class="stamp">{{ _("PAYMENT PENDING") }}</span></div>
+  {% elif o.payment_status == 'refunded' %}<div class="c"><span class="stamp">{{ _("REFUNDED") }}</span></div>
+  {% elif o.balance > 0 %}<div class="r t"><span>{{ _("BALANCE DUE") }}</span><span>{{ o.balance|money(cur) }}</span></div>{% endif %}
+  <hr>
+  <div class="c m">{{ o.items }} {{ _("Items") if o.items != 1 else _("Item") }}</div>
+  <div class="c m">{{ tenant.receipt_footer or _("Thank you for your business") }}</div>
+</div>
+</div>
+{% if autoprint %}<script>window.addEventListener('load',function(){setTimeout(function(){window.print()},250)});</script>{% endif %}
+{% endblock %}

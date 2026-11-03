@@ -17,7 +17,22 @@
     if (!/^\d{1,10}(\.\d{0,2})?$|^\.\d{1,2}$/.test(s)) return null;
     return Math.round(parseFloat(s) * 100);
   }
+  // Amounts are kept in hundredths; they are shown in the business's own currency and number format.
+  var moneyFmt = null, moneyKey = '';
   function money(c) {
+    var t = state.tenant || {};
+    if (t.currency && window.Intl) {
+      var key = t.currency + t.locale;
+      if (key !== moneyKey) {
+        moneyKey = key;
+        try { moneyFmt = new Intl.NumberFormat(t.locale || 'en', {style: 'currency', currency: t.currency, minimumFractionDigits: t.decimals == null ? 2 : t.decimals, maximumFractionDigits: t.decimals == null ? 2 : t.decimals}); }
+        catch (e) { moneyFmt = null; }
+      }
+      if (moneyFmt) {
+        var out = moneyFmt.format(c / 100);
+        return t.symbol && t.symbol !== t.currency && out.indexOf(t.currency) >= 0 ? out.replace(t.currency, t.symbol) : out;
+      }
+    }
     var neg = c < 0, v = Math.abs(c), whole = Math.floor(v / 100).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
     return (neg ? '-' : '') + whole + '.' + ('0' + (v % 100)).slice(-2);
   }

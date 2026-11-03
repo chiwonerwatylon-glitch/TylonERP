@@ -122,8 +122,13 @@ def _user_json(u):
 
 def _tenant_json(t):
     b = t.branding
+    from .regional import precision, symbol
+
     return {"id": t.id, "name": t.name, "slug": t.slug, "plan": t.plan_label, "accent": b.accent if b else None,
-            "ecocash": bool(t.payment and t.payment.ecocash_enabled)}
+            "ecocash": bool(t.payment and t.payment.ecocash_enabled),
+            "currency": t.currency_code, "locale": t.number_locale.replace("_", "-"), "decimals": precision(t.currency_code),
+            "symbol": symbol(t.currency_code, t.number_locale), "timezone": t.tz, "language": t.language,
+            "tax": {"name": t.tax_label, "rate": str(t.tax_percent), "inclusive": t.tax_is_inclusive}}
 
 
 # ---------------------------------------------------------------- catalog

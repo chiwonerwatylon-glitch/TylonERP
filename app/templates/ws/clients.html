@@ -10,7 +10,7 @@
 <div class="mb-4"><label class="form-label" for="ce">Email <span class="text-body-secondary fw-normal">(optional)</span></label><input class="form-control" id="ce" type="email" name="email"></div>
 <div><button class="btn btn-primary">Add client</button></div></form></div>
 <div class="col-lg-8"><div class="card"><div class="card-head"><h2>All clients <span class="text-body-secondary fw-normal">{{ items|length }}</span></h2></div><div class="table-responsive"><table class="table align-middle"><thead><tr><th>Client</th><th>Contact</th><th class="text-end">Owes</th></tr></thead><tbody>
-{% for c in items %}<tr><td class="fw-semibold">{{ c.name }}</td><td class="text-body-secondary">{{ c.phone or '' }} {{ c.email or '' }}</td><td class="text-end">{% if c.balance > 0 %}<span class="badge text-bg-danger">{{ '{:,.2f}'.format(c.balance) }}</span>{% else %}<span class="badge text-bg-success">Clear</span>{% endif %}</td></tr>
+{% for c in items %}<tr><td class="fw-semibold">{{ c.name }}</td><td class="text-body-secondary">{{ c.phone or '' }} {{ c.email or '' }}</td><td class="text-end">{% if c.balance > 0 %}<span class="badge text-bg-danger">{{ ((c.balance)|money) }}</span>{% else %}<span class="badge text-bg-success">Clear</span>{% endif %}</td></tr>
 {% else %}<tr><td colspan="3" class="text-body-secondary">No clients yet. Add your first one with the form.</td></tr>{% endfor %}</tbody></table></div></div></div>
 </div>
 {% endblock %}
